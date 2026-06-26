@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
+    "test:smoke": "playwright test --project=smoke-public --project=smoke-app",
+    "test:smoke-ai": "playwright test --project=smoke-ai",
+    "test:smoke:full": "playwright test --project=smoke-public --project=smoke-app --project=smoke-ai",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"
   },

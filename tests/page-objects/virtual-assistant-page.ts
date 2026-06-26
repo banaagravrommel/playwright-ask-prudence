@@ -1,0 +1,424 @@
+import { expect, type Locator, type Page } from '@playwright/test';
+
+export class VirtualAssistantPage {
+  readonly page: Page;
+  readonly newAssistantButton: Locator;
+  readonly assistantsTable: Locator;
+  readonly askPrudensLink: Locator;
+  readonly sopsTab: Locator;
+  readonly observersTab: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.newAssistantButton = page.getByRole('button', { name: '+ New Assistant' });
+    this.assistantsTable = page.getByRole('table').first();
+    this.askPrudensLink = page.getByRole('link', { name: /Ask Prudens/i });
+    this.sopsTab = page.getByRole('link', { name: /SOPs/i });
+    this.observersTab = page.getByRole('link', { name: /Observers/i });
+  }
+
+  async goto() {
+    await this.page.goto('/virtual-assistant');
+    await this.page.waitForURL(/\/virtual-assistant\/?$/);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectListPage() {
+    await expect(this.page.getByText('Virtual Assistants').first()).toBeVisible();
+    await expect(this.page.getByText(/Manage your AI Virtual Assistants/i)).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Assistants', exact: true })).toBeVisible();
+    await expect(this.newAssistantButton).toBeVisible();
+    await expect(this.assistantsTable).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Assistant' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Personality' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+  }
+
+  async openNewAssistantEditor() {
+    await expect(this.newAssistantButton).toBeEnabled();
+    await this.newAssistantButton.click();
+    await expect(this.page.getByRole('button', { name: /Save Assistant/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('tab', { name: 'Details' })).toBeVisible();
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toBeVisible();
+  }
+
+  async goToAskPrudens() {
+    await this.askPrudensLink.first().click();
+    await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
+  }
+
+  async goToObservers() {
+    await this.observersTab.click();
+    await expect(this.page).toHaveURL(/\/virtual-assistant-observers/);
+  }
+
+  async goToSops() {
+    await this.sopsTab.first().click();
+  }
+
+  async expectSopsPage() {
+    await expect(this.page.getByRole('heading', { name: 'Company SOPs' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Add SOP/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Title' })).toBeVisible();
+  }
+
+  async openAddSopEditor() {
+    await this.page.getByRole('button', { name: /Add SOP/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'New SOP' })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Steps' })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Flow' })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Lead Qualification Process/i)).toBeVisible();
+  }
+
+  async createSop(options: { title: string; description: string; steps: string }) {
+    await this.page.getByPlaceholder(/Lead Qualification Process/i).fill(options.title);
+    await this.page.getByPlaceholder(/Brief description of this SOP/i).fill(options.description);
+    await this.page.getByPlaceholder(/Enter step-by-step procedure/i).fill(options.steps);
+
+    const saveButton = this.page.getByRole('button', { name: /Save SOP/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Company SOPs' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.title }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async openFirstActiveAssistant() {
+    const row = this.page.getByRole('row').filter({ hasText: /active/i }).first();
+    await row.click();
+    await expect(this.page.getByRole('button', { name: /Save Assistant/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toBeVisible();
+  }
+}
+
+export class AskPrudensPage {
+  readonly page: Page;
+  readonly workbench: Locator;
+  readonly agentSelect: Locator;
+  readonly sessionTitleInput: Locator;
+  readonly createSessionButton: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.workbench = page.locator('#ai-workbench-app');
+    this.agentSelect = page.locator('select').filter({
+      has: page.locator('option', { hasText: 'Certificate Review' })
+    });
+    this.sessionTitleInput = page.getByRole('textbox', { name: /Optional title/i });
+    this.createSessionButton = page.getByRole('button', { name: /Create Session/i });
+  }
+
+  async goto() {
+    await this.page.goto('/virtual-assistant/ask-prudens');
+    await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
+    await this.page.waitForLoadState('networkidle');
+    await this.dismissAppSidebarOverlap();
+  }
+
+  async dismissAppSidebarOverlap() {
+    await this.page.evaluate(() => {
+      const sidebar = document.querySelector('.app-sidebar');
+      if (sidebar instanceof HTMLElement) {
+        sidebar.style.display = 'none';
+      }
+    });
+  }
+
+  async openSessionSidebar() {
+    const searchSessions = this.page.getByRole('textbox', { name: /Search sessions/i });
+    if (await searchSessions.isVisible()) {
+      return;
+    }
+
+    await this.workbench.getByTitle('Expand').click({ force: true });
+    await expect(searchSessions).toBeVisible({ timeout: 10000 });
+  }
+
+  async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo') {
+    await this.openSessionSidebar();
+    await this.page.getByText('New chat').click({ force: true });
+    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
+
+    await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
+    await expect(this.page.getByRole('heading', { name: /Pick an account for "Ask Prudens"/i })).toBeVisible();
+
+    await this.page.getByRole('textbox', { name: /Search accounts/i }).fill(accountName);
+    await this.page.waitForTimeout(1500);
+
+    const accountRow = this.page.getByRole('row').filter({ hasText: accountName }).first();
+    await expect(accountRow).toBeVisible({ timeout: 15000 });
+
+    const selectButton = accountRow.getByRole('button').last();
+    if (await selectButton.isVisible()) {
+      await selectButton.click();
+    } else {
+      await accountRow.click();
+    }
+
+    await expect(this.page.getByRole('heading', { name: new RegExp(`Ask Prudens — ${accountName}`, 'i') })).toBeVisible({
+      timeout: 15000
+    });
+
+    await this.agentSelect.selectOption({ label: agent });
+    await this.sessionTitleInput.fill(title);
+    await expect(this.createSessionButton).toBeEnabled();
+    await this.createSessionButton.click();
+    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
+    await this.collapseSessionSidebar();
+  }
+
+  async collapseSessionSidebar() {
+    const collapse = this.workbench.getByTitle('Collapse');
+    if (await collapse.isVisible()) {
+      await collapse.click({ force: true });
+    }
+  }
+
+  async sendMessage(message: string) {
+    const chatInput = this.page.getByPlaceholder(/Ask Prudens anything/i);
+    await expect(chatInput).toBeVisible();
+    await chatInput.fill(message);
+
+    const askButton = this.page.getByRole('button', { name: 'Ask' });
+    await expect(askButton).toBeEnabled();
+    await askButton.click();
+  }
+
+  async expectChatResponse() {
+    await expect(this.page.locator('body')).toContainText(
+      /general liability|insurance|coverage|liability|policy/i,
+      { timeout: 180000 }
+    );
+  }
+
+  async expectWorkbench() {
+    const workbench = this.workbench;
+
+    await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
+    await expect(workbench).toBeVisible();
+
+    const emptyState = workbench.getByRole('heading', { name: 'AI Workbench' });
+    const activeSession = workbench.getByRole('button', { name: 'Chat' });
+    await expect(emptyState.or(activeSession).first()).toBeVisible();
+
+    if (await emptyState.isVisible()) {
+      await expect(this.page.getByRole('textbox', { name: /Search sessions/i })).toBeVisible();
+      await expect(workbench.getByText('New chat')).toBeVisible();
+      await expect(workbench.getByText('Accounts').first()).toBeVisible();
+      await expect(workbench.getByText('Settings').first()).toBeVisible();
+    } else {
+      await expect(activeSession).toBeVisible();
+      await expect(workbench.getByRole('textbox').first()).toBeVisible();
+    }
+  }
+}
+
+export class VirtualAssistantObserversPage {
+  readonly page: Page;
+  readonly newObserverButton: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.newObserverButton = page.getByRole('button', { name: /New Observer/i });
+  }
+
+  async goto() {
+    await this.page.goto('/virtual-assistant-observers');
+    await this.page.waitForURL(/\/virtual-assistant-observers/);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectObserversPage() {
+    await expect(this.page.getByRole('heading', { name: 'Observers' })).toBeVisible();
+    await expect(this.page.getByText('Observer Center')).toBeVisible();
+    await expect(this.newObserverButton).toBeVisible();
+  }
+
+  async openNewObserverForm() {
+    await this.newObserverButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Create Observer' })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/New commercial policy updates/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Observer/i })).toBeVisible();
+  }
+
+  async createObserver(options: { name: string; description: string; source?: string }) {
+    await this.page.getByPlaceholder(/New commercial policy updates/i).fill(options.name);
+    await this.page.getByPlaceholder(/Describe what should be monitored/i).fill(options.description);
+
+    const sourceSelect = this.page.locator('select').filter({ has: this.page.locator('option', { hasText: 'Select source...' }) });
+    await sourceSelect.selectOption(options.source ?? 'HubSpot');
+
+    await this.page.getByRole('button', { name: /Save Observer/i }).click();
+
+    const savedDialog = this.page.getByRole('dialog', { name: 'Saved' });
+    await expect(savedDialog).toBeVisible({ timeout: 15000 });
+    await savedDialog.getByRole('button', { name: 'OK' }).click();
+    await expect(savedDialog).toBeHidden();
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+}
+
+export class VirtualAssistantSettingsPage {
+  readonly page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  async goto(section?: 'knowledge-base' | 'forms' | 'tools' | 'verifications' | 'escalations' | 'simulate') {
+    const path = section ? `/virtual-assistant-settings?section=${section}` : '/virtual-assistant-settings';
+    await this.page.goto(path);
+    await this.page.waitForURL(/\/virtual-assistant-settings/);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async gotoTriggerAdmin() {
+    await this.page.goto('/virtual-assistant-settings/triggers');
+    await this.page.waitForURL(/\/virtual-assistant-settings\/triggers/);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectPageShell() {
+    await expect(this.page.getByText('Virtual Assistant Settings').first()).toBeVisible();
+    await expect(this.page.getByText(/Configure data capture, forms, tools, and other settings/i)).toBeVisible();
+    await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('link', { name: /Live Data/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+    await expect(this.settingsNavLink('Knowledge Base')).toBeVisible();
+    await expect(this.settingsNavLink('Forms')).toBeVisible();
+    await expect(this.settingsNavLink('Tools')).toBeVisible();
+    await expect(this.settingsNavLink('Trigger')).toBeVisible();
+    await expect(this.settingsNavLink('Verifications')).toBeVisible();
+    await expect(this.settingsNavLink('Escalations')).toBeVisible();
+    await expect(this.settingsNavLink('Simulate')).toBeVisible();
+  }
+
+  settingsNavLink(name: string) {
+    return this.page.locator('a[href*="virtual-assistant-settings"]').filter({ hasText: name }).first();
+  }
+
+  async goToSection(section: 'Knowledge Base' | 'Forms' | 'Tools' | 'Trigger Admin' | 'Verifications' | 'Escalations' | 'Simulate') {
+    if (section === 'Trigger Admin') {
+      await this.settingsNavLink('Trigger').click();
+      await this.page.waitForURL(/\/virtual-assistant-settings\/triggers/);
+    } else {
+      await this.settingsNavLink(section).click();
+    }
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectKnowledgeBasesSection() {
+    await expect(this.page.getByRole('heading', { name: 'Knowledge Bases' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Add Knowledge Base/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Purpose' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Documents' })).toBeVisible();
+  }
+
+  async expectFormsSection() {
+    await expect(this.page).toHaveURL(/section=forms/);
+    await expect(this.page.getByRole('heading', { name: 'Forms' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /New Form/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Schema' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Fields' })).toBeVisible();
+  }
+
+  async expectToolsSection() {
+    await expect(this.page).toHaveURL(/section=tools/);
+    await expect(this.page.getByRole('heading', { name: 'Agent Tools' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Add Tool/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Type' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Provider' })).toBeVisible();
+  }
+
+  async openNewFormEditor() {
+    await this.page.getByRole('button', { name: /New Form/i }).click();
+    await expect(this.page.getByText('New Form').first()).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Form Details' })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Schema' })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Field Selection' })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Enter form name/i)).toBeVisible();
+  }
+
+  async openAddKnowledgeBaseEditor() {
+    await this.page.getByRole('button', { name: /Add Knowledge Base/i }).click();
+    await expect(this.page.getByPlaceholder(/Product Documentation/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Knowledge Base/i })).toBeVisible();
+  }
+
+  async createKnowledgeBase(options: { name: string; purpose: string }) {
+    await this.page.getByPlaceholder(/Product Documentation/i).fill(options.name);
+    await this.page.getByPlaceholder(/Describe what this knowledge base/i).fill(options.purpose);
+
+    const saveButton = this.page.getByRole('button', { name: /Save Knowledge Base/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Knowledge Bases' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async openAddToolEditor() {
+    await this.page.getByRole('button', { name: /Add Tool/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'New Tool' })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Enter tool name/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Tool/i })).toBeVisible();
+  }
+
+  async createTool(options: { name: string; description: string; type?: string }) {
+    await this.page.getByPlaceholder(/Enter tool name/i).fill(options.name);
+    await this.page.locator('select').first().selectOption({ label: options.type ?? 'Internal Function' });
+    await this.page.getByPlaceholder(/Describe what this tool does/i).fill(options.description);
+
+    const saveButton = this.page.getByRole('button', { name: /Save Tool/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Agent Tools' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectTriggerAdminSection() {
+    await expect(this.page).toHaveURL(/\/virtual-assistant-settings\/triggers/);
+    await expect(this.page.getByRole('heading', { name: 'Triggers' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /New Trigger/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Event' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Integration Mapping' })).toBeVisible();
+  }
+
+  async openNewTriggerEditor() {
+    await this.page.getByRole('button', { name: /New Trigger/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'New Trigger' })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/New account workflow handoff/i)).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Describe the trigger behavior/i)).toBeVisible();
+  }
+
+  async expectVerificationsSection() {
+    await expect(this.page).toHaveURL(/section=verifications/);
+    await expect(this.page.getByRole('heading', { name: 'Verifications' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Add Verification/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Scope' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Provider' })).toBeVisible();
+  }
+
+  async openAddVerificationEditor() {
+    await this.page.getByRole('button', { name: /Add Verification/i }).click();
+    await expect(this.page.getByRole('heading', { name: /New Verification/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Customer Identity Check/i)).toBeVisible();
+    await expect(this.page.getByText(/Verification Scope/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Verification/i })).toBeVisible();
+  }
+
+  async expectEscalationsSection() {
+    await expect(this.page).toHaveURL(/section=escalations/);
+    await expect(this.page.getByRole('heading', { name: /Escalations/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('heading', { level: 6, name: / Sync Escalations/ })).toBeVisible();
+    await expect(this.page.getByRole('heading', { level: 6, name: / Async Escalations/ })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Settings/i })).toBeVisible();
+  }
+
+  async expectSimulateSection() {
+    await expect(this.page).toHaveURL(/section=simulate/);
+    await expect(this.page.getByRole('heading', { name: 'Simulate' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Agent Name' })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: 'Event Trigger' })).toBeVisible();
+  }
+}
