@@ -1,0 +1,15 @@
+{
+  "name": "playwright-prudence-login",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.76",
+    "@playwright/test": "^1.44.0",
+    "typescript": "^5.5.0"
+  }
+}
