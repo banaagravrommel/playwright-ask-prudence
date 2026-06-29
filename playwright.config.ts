@@ -56,7 +56,7 @@ export default defineConfig({
     },
     {
       name: 'smoke-app',
-      testMatch: ['**/smoke/navigation.smoke.spec.ts', '**/smoke/virtual-assistant.smoke.spec.ts'],
+      testMatch: ['**/smoke/navigation.smoke.spec.ts', '**/smoke/virtual-assistant.smoke.spec.ts', '**/smoke/virtual-assistant-settings.smoke.spec.ts'],
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
