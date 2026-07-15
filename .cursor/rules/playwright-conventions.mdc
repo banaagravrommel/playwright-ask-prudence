@@ -1,0 +1,15 @@
+---
+description: Playwright page-object and smoke test conventions for this repo
+globs: tests/**/*.ts
+alwaysApply: false
+---
+
+# Playwright Conventions
+
+- Put reusable UI actions/assertions in `tests/page-objects/`. Specs stay thin.
+- Smoke specs live under `tests/smoke/` and use the `@smoke` describe tag.
+- Page objects expose `goto()` plus `expect…()` methods; match patterns already used for Virtual Assistant.
+- Prefer role/text locators (`getByRole`, `getByText`). Avoid brittle CSS/XPath unless necessary.
+- Authenticated smokes use the existing Playwright projects (`smoke-app` + `storageState`); do not re-login inline unless testing auth.
+- New smokes must be included by existing `testMatch` in `playwright.config.ts`, or update that project’s match list.
+- Keep selectors resilient to empty states (page can show “No calls yet” and still be valid).

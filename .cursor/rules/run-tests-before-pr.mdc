@@ -1,0 +1,11 @@
+---
+description: Run changed Playwright tests before opening a PR
+alwaysApply: true
+---
+
+# Run Tests Before PR
+
+- Before commit/PR for test changes, run the new or changed test(s) with the correct project (usually `smoke-app` or `smoke-ai`).
+- Prefer a targeted filter (`-g "test name"`) over the full suite for speed; run the owning smoke file when in doubt.
+- Do not open a PR for failing tests. Fix and re-run first.
+- Mention what was run in the PR test plan (command or test title + pass/fail).

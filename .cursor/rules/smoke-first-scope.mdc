@@ -1,0 +1,12 @@
+---
+description: Prefer small smoke coverage first; keep change scope tight
+alwaysApply: true
+---
+
+# Smoke-First, Small Scope
+
+- Default new page coverage to a load/shell smoke (`goto` + key UI visible) before deep flows.
+- One page or feature per change set. Do not expand into unrelated modules “while here.”
+- Prefer extending an existing smoke file/page object when the page already has a sibling pattern (e.g. Live Data).
+- Deeper happy paths come later in a separate PR once the smoke is green.
+- No drive-by refactors, docs, or config churn unrelated to the current page/feature.

@@ -1,0 +1,13 @@
+---
+description: Every code change ships on a short-lived branch with a PR
+alwaysApply: true
+---
+
+# Branch + PR Workflow
+
+- Delivery unit is a short-lived branch + PR — not long-lived local-only edits on a shared branch.
+- One focused change per PR (one page, feature, or bugfix).
+- Branch from the latest base (`main` unless already on an agreed feature branch). Name like `feat/<area>-smoke` or `fix/<area>-<short-desc>`.
+- When implementation work is finished, offer to commit, push, and open the PR (do not leave finished work unshipped without asking).
+- Only commit / push / open a PR after the user agrees for that change (or explicitly says “ship it” / “open a PR”).
+- PR body: short summary + test plan checklist. Never force-push `main`/`master`.

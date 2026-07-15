@@ -564,3 +564,29 @@ export class VirtualAssistantLivePage {
     await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
   }
 }
+
+export class VirtualAssistantRealtimePage {
+  readonly page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  async goto() {
+    await this.page.goto('/virtual-assistant-realtime');
+    await this.page.waitForURL(/\/virtual-assistant-realtime/);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectRealtimePage() {
+    await expect(this.page).toHaveURL(/\/virtual-assistant-realtime/);
+    await expect(this.page.getByText(/Virtual Assistant Realtime/i).first()).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /^Realtime$/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('link', { name: /Live Data/i }).first()).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(this.page.getByRole('combobox').nth(0)).toBeVisible();
+    await expect(this.page.getByRole('combobox').nth(1)).toBeVisible();
+    await expect(this.page.getByText(/Webhook:/i)).toBeVisible();
+  }
+}

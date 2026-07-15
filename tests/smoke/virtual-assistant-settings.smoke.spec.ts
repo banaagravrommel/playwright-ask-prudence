@@ -1,6 +1,7 @@
 import { test } from '@playwright/test';
 import {
   VirtualAssistantLivePage,
+  VirtualAssistantRealtimePage,
   VirtualAssistantSettingsPage
 } from '../page-objects/virtual-assistant-page';
 import { smokeLabel } from '../helpers/smoke-data';
@@ -58,5 +59,11 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     const livePage = new VirtualAssistantLivePage(page);
     await livePage.goto();
     await livePage.expectLiveDataPage();
+  });
+
+  test('realtime page loads with call monitors', async ({ page }) => {
+    const realtimePage = new VirtualAssistantRealtimePage(page);
+    await realtimePage.goto();
+    await realtimePage.expectRealtimePage();
   });
 });
