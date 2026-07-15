@@ -89,7 +89,21 @@ test.describe('Virtual Assistant smoke @smoke', () => {
   test('ask prudens workbench loads', async ({ page }) => {
     const askPage = new AskPrudensPage(page);
     await askPage.goto();
+    await askPage.expectPageShell();
+    await askPage.expectSessionSidebarControls();
     await askPage.expectWorkbench();
+  });
+
+  test('ask prudens creates a demo chat session', async ({ page }) => {
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-flow');
+
+    await askPage.goto();
+    const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo', 'smoke');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+    await askPage.expectAskPrudensSessionTabs(resourceName);
+    await askPage.expectAskPrudensAgentDialog('Demo');
+    await askPage.expectAskPrudensSopDialog();
   });
 
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {

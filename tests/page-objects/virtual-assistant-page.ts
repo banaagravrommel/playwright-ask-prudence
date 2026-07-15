@@ -112,6 +112,7 @@ export class AskPrudensPage {
     await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
     await this.page.waitForLoadState('networkidle');
     await this.dismissAppSidebarOverlap();
+    await this.dismissSessionLoadErrorIfPresent();
   }
 
   async dismissAppSidebarOverlap() {
@@ -121,6 +122,13 @@ export class AskPrudensPage {
         sidebar.style.display = 'none';
       }
     });
+  }
+
+  async dismissSessionLoadErrorIfPresent() {
+    const errorDialog = this.page.getByRole('dialog', { name: 'Error' });
+    if (await errorDialog.isVisible()) {
+      await errorDialog.getByRole('button', { name: 'OK' }).click();
+    }
   }
 
   async openSessionSidebar() {
@@ -133,9 +141,9 @@ export class AskPrudensPage {
     await expect(searchSessions).toBeVisible({ timeout: 10000 });
   }
 
-  async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo') {
+  async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo', resourceSearch?: string) {
     await this.openSessionSidebar();
-    await this.page.getByText('New chat').click({ force: true });
+    await this.workbench.getByText('New chat').click({ force: true });
     await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
 
     await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
@@ -160,10 +168,88 @@ export class AskPrudensPage {
 
     await this.agentSelect.selectOption({ label: agent });
     await this.sessionTitleInput.fill(title);
+    const selectedResource = resourceSearch ? await this.selectFirstExistingResource(resourceSearch) : undefined;
     await expect(this.createSessionButton).toBeEnabled();
     await this.createSessionButton.click();
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
     await this.collapseSessionSidebar();
+    return selectedResource;
+  }
+
+  async selectFirstExistingResource(searchTerm: string) {
+    const resourceSelect = this.page.locator('.resource-select-wrapper');
+    const resourceSearch = resourceSelect.locator('input[type="search"]').first();
+    await expect(resourceSearch).toBeVisible({ timeout: 15000 });
+    await resourceSearch.fill(searchTerm);
+
+    const firstOption = this.page.locator('.vs__dropdown-option').filter({ hasText: searchTerm }).first();
+    await expect(firstOption).toBeVisible({ timeout: 15000 });
+    const resourceName = ((await firstOption.textContent()) ?? '').replace(/\([^)]*\)/g, '').trim();
+    await firstOption.click();
+
+    await expect(resourceSelect.locator('.vs__selected').filter({ hasText: resourceName }).first()).toBeVisible();
+    return resourceName;
+  }
+
+  async expectAskPrudensChatReady(title: string, options: { accountName?: string; agent?: string } = {}) {
+    const accountName = options.accountName ?? 'Demo';
+    const agent = options.agent ?? 'Demo';
+    const sessionBanner = this.page.getByRole('banner').filter({ hasText: title }).first();
+
+    await expect(sessionBanner).toBeVisible({ timeout: 30000 });
+    await expect(sessionBanner).toContainText(accountName);
+    await expect(sessionBanner).toContainText(/draft/i);
+    await expect(sessionBanner.getByRole('button', { name: 'Chat' })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Sources/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: new RegExp(agent, 'i') })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /SOP/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
+  }
+
+  async expectAskPrudensSessionTabs(resourceName?: string) {
+    await this.page.getByRole('button', { name: 'Chat' }).click();
+    await expect(this.workbench.getByText(/Send a message to start/i)).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
+
+    await this.page.getByRole('button', { name: /Sources/i }).click();
+    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
+    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+    if (resourceName) {
+      await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
+      await expect(this.workbench.getByText('documents', { exact: true }).first()).toBeVisible();
+    } else {
+      await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+    }
+
+    await this.page.getByRole('button', { name: /Activities/i }).click();
+    await expect(this.workbench.getByText('Activities').last()).toBeVisible();
+    await expect(this.workbench.getByText(/No activities yet/i)).toBeVisible();
+  }
+
+  async expectAskPrudensAgentDialog(agent = 'Demo') {
+    await this.page.getByRole('button', { name: new RegExp(agent, 'i') }).click();
+    const dialog = this.page.getByRole('dialog', { name: /Switch Agent/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
+    await expect(dialog.getByRole('combobox')).toContainText(agent);
+    await expect(dialog.getByRole('button', { name: /Switch/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Cancel/i }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  async expectAskPrudensSopDialog() {
+    await this.page.getByRole('button', { name: /SOP/i }).click();
+    const dialog = this.page.getByRole('dialog', { name: /Select SOP/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Attach a Standard Operating Procedure/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Apply/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Cancel/i }).click();
+    await expect(dialog).toBeHidden();
   }
 
   async collapseSessionSidebar() {
@@ -188,6 +274,28 @@ export class AskPrudensPage {
       /general liability|insurance|coverage|liability|policy/i,
       { timeout: 180000 }
     );
+  }
+
+  async expectPageShell() {
+    await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
+    await expect(this.page.getByText(/Ask Prudens\s+AI Workbench/).first()).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Back/i })).toBeVisible();
+  }
+
+  async expectSessionSidebarControls() {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+
+    const sidebar = this.workbench.getByRole('complementary');
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.getByRole('textbox', { name: /Search sessions/i })).toBeVisible();
+    await expect(sidebar.getByRole('combobox').nth(0)).toBeVisible();
+    await expect(sidebar.getByRole('combobox').nth(1)).toBeVisible();
+    await expect(sidebar.getByText('New chat')).toBeVisible();
+    await expect(sidebar.getByText('Accounts')).toBeVisible();
+    await expect(sidebar.getByText('Settings')).toBeVisible();
+    await expect(sidebar.getByText('Assistants')).toBeVisible();
+    await expect(sidebar.getByText('Chats')).toBeVisible();
   }
 
   async expectWorkbench() {
