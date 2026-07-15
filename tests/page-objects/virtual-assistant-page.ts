@@ -112,6 +112,7 @@ export class AskPrudensPage {
     await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
     await this.page.waitForLoadState('networkidle');
     await this.dismissAppSidebarOverlap();
+    await this.dismissSessionLoadErrorIfPresent();
   }
 
   async dismissAppSidebarOverlap() {
@@ -121,6 +122,13 @@ export class AskPrudensPage {
         sidebar.style.display = 'none';
       }
     });
+  }
+
+  async dismissSessionLoadErrorIfPresent() {
+    const errorDialog = this.page.getByRole('dialog', { name: 'Error' });
+    if (await errorDialog.isVisible()) {
+      await errorDialog.getByRole('button', { name: 'OK' }).click();
+    }
   }
 
   async openSessionSidebar() {
@@ -188,6 +196,28 @@ export class AskPrudensPage {
       /general liability|insurance|coverage|liability|policy/i,
       { timeout: 180000 }
     );
+  }
+
+  async expectPageShell() {
+    await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
+    await expect(this.page.getByText(/Ask Prudens\s+AI Workbench/).first()).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Back/i })).toBeVisible();
+  }
+
+  async expectSessionSidebarControls() {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+
+    const sidebar = this.workbench.getByRole('complementary');
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.getByRole('textbox', { name: /Search sessions/i })).toBeVisible();
+    await expect(sidebar.getByRole('combobox').nth(0)).toBeVisible();
+    await expect(sidebar.getByRole('combobox').nth(1)).toBeVisible();
+    await expect(sidebar.getByText('New chat')).toBeVisible();
+    await expect(sidebar.getByText('Accounts')).toBeVisible();
+    await expect(sidebar.getByText('Settings')).toBeVisible();
+    await expect(sidebar.getByText('Assistants')).toBeVisible();
+    await expect(sidebar.getByText('Chats')).toBeVisible();
   }
 
   async expectWorkbench() {

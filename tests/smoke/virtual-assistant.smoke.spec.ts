@@ -89,6 +89,8 @@ test.describe('Virtual Assistant smoke @smoke', () => {
   test('ask prudens workbench loads', async ({ page }) => {
     const askPage = new AskPrudensPage(page);
     await askPage.goto();
+    await askPage.expectPageShell();
+    await askPage.expectSessionSidebarControls();
     await askPage.expectWorkbench();
   });
 
