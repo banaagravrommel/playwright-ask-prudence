@@ -179,8 +179,25 @@ export class AskPrudensPage {
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Sources/i })).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Demo/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /SOP/i })).toBeVisible();
     await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Ask/i })).toBeVisible();
+  }
+
+  async expectAskPrudensSessionTabs() {
+    await this.page.getByRole('button', { name: /Sources/i }).click();
+    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
+    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+    await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+
+    await this.page.getByRole('button', { name: /Activities/i }).click();
+    await expect(this.workbench.getByText('Activities').last()).toBeVisible();
+    await expect(this.workbench.getByText(/No activities yet/i)).toBeVisible();
+
+    await this.page.getByRole('button', { name: 'Chat' }).click();
+    await expect(this.workbench.getByText(/Send a message to start/i)).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
   }
 
   async collapseSessionSidebar() {
