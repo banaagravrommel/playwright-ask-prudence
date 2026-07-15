@@ -143,7 +143,7 @@ export class AskPrudensPage {
 
   async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo') {
     await this.openSessionSidebar();
-    await this.page.getByText('New chat').click({ force: true });
+    await this.workbench.getByText('New chat').click({ force: true });
     await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
 
     await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
@@ -172,6 +172,15 @@ export class AskPrudensPage {
     await this.createSessionButton.click();
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
     await this.collapseSessionSidebar();
+  }
+
+  async expectAskPrudensChatReady(title: string) {
+    await expect(this.page.getByRole('banner').filter({ hasText: title }).first()).toBeVisible({ timeout: 30000 });
+    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Sources/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeVisible();
   }
 
   async collapseSessionSidebar() {
