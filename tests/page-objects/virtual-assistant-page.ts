@@ -191,23 +191,35 @@ export class AskPrudensPage {
     return resourceName;
   }
 
-  async expectAskPrudensChatReady(title: string) {
-    await expect(this.page.getByRole('banner').filter({ hasText: title }).first()).toBeVisible({ timeout: 30000 });
-    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Sources/i })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Activities/i })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Demo/i })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /SOP/i })).toBeVisible();
+  async expectAskPrudensChatReady(title: string, options: { accountName?: string; agent?: string } = {}) {
+    const accountName = options.accountName ?? 'Demo';
+    const agent = options.agent ?? 'Demo';
+    const sessionBanner = this.page.getByRole('banner').filter({ hasText: title }).first();
+
+    await expect(sessionBanner).toBeVisible({ timeout: 30000 });
+    await expect(sessionBanner).toContainText(accountName);
+    await expect(sessionBanner).toContainText(/draft/i);
+    await expect(sessionBanner.getByRole('button', { name: 'Chat' })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Sources/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: new RegExp(agent, 'i') })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /SOP/i })).toBeVisible();
     await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
   }
 
   async expectAskPrudensSessionTabs(resourceName?: string) {
+    await this.page.getByRole('button', { name: 'Chat' }).click();
+    await expect(this.workbench.getByText(/Send a message to start/i)).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
+
     await this.page.getByRole('button', { name: /Sources/i }).click();
     await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
     await expect(this.workbench.getByText('Add sources')).toBeVisible();
     if (resourceName) {
       await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
+      await expect(this.workbench.getByText('documents', { exact: true }).first()).toBeVisible();
     } else {
       await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
     }
@@ -215,10 +227,29 @@ export class AskPrudensPage {
     await this.page.getByRole('button', { name: /Activities/i }).click();
     await expect(this.workbench.getByText('Activities').last()).toBeVisible();
     await expect(this.workbench.getByText(/No activities yet/i)).toBeVisible();
+  }
 
-    await this.page.getByRole('button', { name: 'Chat' }).click();
-    await expect(this.workbench.getByText(/Send a message to start/i)).toBeVisible();
-    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+  async expectAskPrudensAgentDialog(agent = 'Demo') {
+    await this.page.getByRole('button', { name: new RegExp(agent, 'i') }).click();
+    const dialog = this.page.getByRole('dialog', { name: /Switch Agent/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
+    await expect(dialog.getByRole('combobox')).toContainText(agent);
+    await expect(dialog.getByRole('button', { name: /Switch/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Cancel/i }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  async expectAskPrudensSopDialog() {
+    await this.page.getByRole('button', { name: /SOP/i }).click();
+    const dialog = this.page.getByRole('dialog', { name: /Select SOP/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Attach a Standard Operating Procedure/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Apply/i })).toBeVisible();
+    await dialog.getByRole('button', { name: /Cancel/i }).click();
+    await expect(dialog).toBeHidden();
   }
 
   async collapseSessionSidebar() {
