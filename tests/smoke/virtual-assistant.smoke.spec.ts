@@ -99,9 +99,9 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     const sessionTitle = smokeLabel('ask-prudens-flow');
 
     await askPage.goto();
-    await askPage.startAskPrudensChatSession('Demo', sessionTitle);
+    const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo', 'smoke');
     await askPage.expectAskPrudensChatReady(sessionTitle);
-    await askPage.expectAskPrudensSessionTabs();
+    await askPage.expectAskPrudensSessionTabs(resourceName);
   });
 
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {

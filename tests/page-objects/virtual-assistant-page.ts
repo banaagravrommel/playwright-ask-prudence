@@ -141,7 +141,7 @@ export class AskPrudensPage {
     await expect(searchSessions).toBeVisible({ timeout: 10000 });
   }
 
-  async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo') {
+  async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo', resourceSearch?: string) {
     await this.openSessionSidebar();
     await this.workbench.getByText('New chat').click({ force: true });
     await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
@@ -168,10 +168,27 @@ export class AskPrudensPage {
 
     await this.agentSelect.selectOption({ label: agent });
     await this.sessionTitleInput.fill(title);
+    const selectedResource = resourceSearch ? await this.selectFirstExistingResource(resourceSearch) : undefined;
     await expect(this.createSessionButton).toBeEnabled();
     await this.createSessionButton.click();
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
     await this.collapseSessionSidebar();
+    return selectedResource;
+  }
+
+  async selectFirstExistingResource(searchTerm: string) {
+    const resourceSelect = this.page.locator('.resource-select-wrapper');
+    const resourceSearch = resourceSelect.locator('input[type="search"]').first();
+    await expect(resourceSearch).toBeVisible({ timeout: 15000 });
+    await resourceSearch.fill(searchTerm);
+
+    const firstOption = this.page.locator('.vs__dropdown-option').filter({ hasText: searchTerm }).first();
+    await expect(firstOption).toBeVisible({ timeout: 15000 });
+    const resourceName = ((await firstOption.textContent()) ?? '').replace(/\([^)]*\)/g, '').trim();
+    await firstOption.click();
+
+    await expect(resourceSelect.locator('.vs__selected').filter({ hasText: resourceName }).first()).toBeVisible();
+    return resourceName;
   }
 
   async expectAskPrudensChatReady(title: string) {
@@ -185,11 +202,15 @@ export class AskPrudensPage {
     await expect(this.page.getByRole('button', { name: /Ask/i })).toBeVisible();
   }
 
-  async expectAskPrudensSessionTabs() {
+  async expectAskPrudensSessionTabs(resourceName?: string) {
     await this.page.getByRole('button', { name: /Sources/i }).click();
     await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
     await expect(this.workbench.getByText('Add sources')).toBeVisible();
-    await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+    if (resourceName) {
+      await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
+    } else {
+      await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+    }
 
     await this.page.getByRole('button', { name: /Activities/i }).click();
     await expect(this.workbench.getByText('Activities').last()).toBeVisible();
