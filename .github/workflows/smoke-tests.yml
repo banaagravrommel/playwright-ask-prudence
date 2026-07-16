@@ -7,7 +7,7 @@ on:
       - main
       - master
   schedule:
-    # Nightly Tier 2 AI smoke at 06:00 UTC
+    # Nightly smoke suites at 06:00 UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -22,10 +22,22 @@ concurrency:
 
 jobs:
   smoke:
-    name: Tier 1 smoke
+    name: Tier 1 smoke (${{ matrix.suite_name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite_name: Public
+            project: smoke-public
+            artifact_suffix: smoke-public
+            timeout_minutes: 15
+          - suite_name: App
+            project: smoke-app
+            artifact_suffix: smoke-app
+            timeout_minutes: 30
 
     steps:
       - name: Checkout
@@ -43,8 +55,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Tier 1 smoke tests
-        run: npm run test:smoke
+      - name: Run ${{ matrix.suite_name }} smoke tests
+        run: npx playwright test --project=${{ matrix.project }}
         env:
           CI: true
           PRUDENS_TEST_EMAIL: ${{ secrets.PRUDENS_TEST_EMAIL }}
@@ -54,7 +66,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-tier1
+          name: playwright-report-${{ matrix.artifact_suffix }}
           path: playwright-report/
           retention-days: 7
 
@@ -62,16 +74,76 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-tier1
+          name: test-results-${{ matrix.artifact_suffix }}
+          path: test-results/
+          retention-days: 7
+
+  scheduled-smoke:
+    name: Scheduled smoke (${{ matrix.suite_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    if: github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite_name: Public
+            project: smoke-public
+            artifact_suffix: scheduled-smoke-public
+            timeout_minutes: 15
+          - suite_name: App
+            project: smoke-app
+            artifact_suffix: scheduled-smoke-app
+            timeout_minutes: 30
+          - suite_name: AI
+            project: smoke-ai
+            artifact_suffix: scheduled-smoke-ai
+            timeout_minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run ${{ matrix.suite_name }} smoke tests
+        run: npx playwright test --project=${{ matrix.project }}
+        env:
+          CI: true
+          PRUDENS_TEST_EMAIL: ${{ secrets.PRUDENS_TEST_EMAIL }}
+          PRUDENS_TEST_PASSWORD: ${{ secrets.PRUDENS_TEST_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.artifact_suffix }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.artifact_suffix }}
           path: test-results/
           retention-days: 7
 
   smoke-ai:
     name: Tier 2 AI smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     if: >-
-      github.event_name == 'schedule' ||
       (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) ||
       (github.event_name == 'workflow_dispatch' && inputs.run_ai)
 
