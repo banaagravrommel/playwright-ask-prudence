@@ -106,6 +106,18 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectAskPrudensSopDialog();
   });
 
+  test('ask prudens creates a certificate review session', async ({ page }) => {
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-cert-review');
+
+    await askPage.goto();
+    const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Certificate Review', 'smoke');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Certificate Review' });
+    await askPage.expectAskPrudensSessionTabs(resourceName);
+    await askPage.expectAskPrudensAgentDialog('Certificate Review');
+    await askPage.expectAskPrudensSopDialog();
+  });
+
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     await vaPage.goto();

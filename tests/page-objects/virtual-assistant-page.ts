@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { expectPageBaseline } from '../helpers/page-baseline';
 
 export class VirtualAssistantPage {
   readonly page: Page;
@@ -24,14 +25,14 @@ export class VirtualAssistantPage {
   }
 
   async expectListPage() {
-    await expect(this.page.getByText('Virtual Assistants').first()).toBeVisible();
-    await expect(this.page.getByText(/Manage your AI Virtual Assistants/i)).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Assistants', exact: true })).toBeVisible();
-    await expect(this.newAssistantButton).toBeVisible();
+    await expectPageBaseline(this.page, {
+      url: /\/virtual-assistant\/?$/,
+      visibleText: [/Virtual Assistants/i, /Manage your AI Virtual Assistants/i],
+      headings: ['Assistants'],
+      buttons: [/New Assistant/i],
+      columnHeaders: ['Assistant', 'Personality', 'Contact', 'Capabilities', 'Status', 'Actions']
+    });
     await expect(this.assistantsTable).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Assistant' })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Personality' })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
   }
 
   async openNewAssistantEditor() {
@@ -263,23 +264,39 @@ export class AskPrudensPage {
     const chatInput = this.page.getByPlaceholder(/Ask Prudens anything/i);
     await expect(chatInput).toBeVisible();
     await chatInput.fill(message);
+    await expect(chatInput).toHaveValue(message);
 
     const askButton = this.page.getByRole('button', { name: 'Ask' });
     await expect(askButton).toBeEnabled();
     await askButton.click();
+
+    const userMessage = this.workbench.locator('.aw-msg--user .aw-msg__content').filter({ hasText: message }).last();
+    await expect(userMessage).toBeVisible({ timeout: 15000 });
+    await expect(chatInput).toHaveValue('');
   }
 
-  async expectChatResponse() {
-    await expect(this.page.locator('body')).toContainText(
-      /general liability|insurance|coverage|liability|policy/i,
+  async expectChatResponse(message?: string) {
+    if (message) {
+      const userMessage = this.workbench.locator('.aw-msg--user .aw-msg__content').filter({ hasText: message }).last();
+      await expect(userMessage).toBeVisible();
+    }
+
+    const assistantMessage = this.workbench.locator('.aw-msg--assistant .aw-msg__content').last();
+    await expect(assistantMessage).toBeVisible({ timeout: 180000 });
+    await expect(assistantMessage).toContainText(
+      /general liability|insurance|coverage|liability|policy|knowledge base/i,
       { timeout: 180000 }
     );
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
   }
 
   async expectPageShell() {
-    await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
-    await expect(this.page.getByText(/Ask Prudens\s+AI Workbench/).first()).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Back/i })).toBeVisible();
+    await expectPageBaseline(this.page, {
+      url: /\/virtual-assistant\/ask-prudens/,
+      visibleText: [/Ask Prudens\s+AI Workbench/i],
+      buttons: [/Back/i]
+    });
   }
 
   async expectSessionSidebarControls() {
@@ -387,11 +404,13 @@ export class VirtualAssistantSettingsPage {
   }
 
   async expectPageShell() {
-    await expect(this.page.getByText('Virtual Assistant Settings').first()).toBeVisible();
-    await expect(this.page.getByText(/Configure data capture, forms, tools, and other settings/i)).toBeVisible();
+    await expectPageBaseline(this.page, {
+      url: /\/virtual-assistant-settings/,
+      visibleText: ['Virtual Assistant Settings', /Configure data capture, forms, tools, and other settings/i],
+      headings: ['Settings']
+    });
     await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
     await expect(this.page.getByRole('link', { name: /Live Data/i }).first()).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await expect(this.settingsNavLink('Knowledge Base')).toBeVisible();
     await expect(this.settingsNavLink('Forms')).toBeVisible();
     await expect(this.settingsNavLink('Tools')).toBeVisible();

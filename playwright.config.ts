@@ -56,8 +56,14 @@ export default defineConfig({
     },
     {
       name: 'smoke-app',
-      testMatch: ['**/smoke/navigation.smoke.spec.ts', '**/smoke/virtual-assistant.smoke.spec.ts', '**/smoke/virtual-assistant-settings.smoke.spec.ts'],
+      testMatch: ['**/smoke/*.smoke.spec.ts'],
+      testIgnore: [
+        '**/smoke/public.smoke.spec.ts',
+        '**/smoke/auth.smoke.spec.ts',
+        '**/smoke/*-ai.smoke.spec.ts'
+      ],
       dependencies: ['setup'],
+      timeout: 90 * 1000,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'storageState.json'
