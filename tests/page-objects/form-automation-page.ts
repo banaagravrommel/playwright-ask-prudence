@@ -25,7 +25,37 @@ export class FormFillTemplatesPage {
 
   async openAddTemplateEditor() {
     await this.page.getByRole('button', { name: /Add Template/i }).click();
-    await expect(this.page.getByRole('button', { name: /Save|Create|Add/i }).first()).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByPlaceholder(/Enter template name/i)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('button', { name: /Save & Edit/i })).toBeVisible();
+  }
+
+  async createTemplate(options: { name: string; type?: 'HTML' | 'PDF' }) {
+    await this.openAddTemplateEditor();
+
+    const nameInput = this.page.getByPlaceholder(/Enter template name/i);
+    await nameInput.fill(options.name);
+    await expect(nameInput).toHaveValue(options.name);
+
+    if (options.type) {
+      await this.page.locator('select').first().selectOption({ label: options.type });
+    }
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/form-fill-template\/templates\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    await this.page.getByRole('button', { name: /Save & Edit/i }).click();
+    await saveResponse;
+    await this.expectTemplateEditor(options.name);
+  }
+
+  async expectTemplateEditor(name: string) {
+    await expect(this.page.getByPlaceholder(/Enter template name/i)).toHaveValue(name);
+    await expect(this.page.getByText(/Select a schema to load fields/i)).toBeVisible({ timeout: 15000 });
   }
 }
 
@@ -53,10 +83,10 @@ export class FormFillPage {
 
   async openNewFormFill() {
     await this.page.getByRole('button', { name: /New/i }).first().click();
-    await expect(
-      this.page.getByRole('heading', { name: /Pick an account|New|Form Fill/i }).or(
-        this.page.getByRole('textbox', { name: /Search accounts/i })
-      ).first()
-    ).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('heading', { name: /New Form Fill Record/i })).toBeVisible({
+      timeout: 15000
+    });
+    await expect(this.page.getByPlaceholder(/e.g. Renewal Packet/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save/i }).first()).toBeVisible();
   }
 }
