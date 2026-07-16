@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { expectPageBaseline } from '../helpers/page-baseline';
 
 export class PolicyComparisonPage {
   readonly page: Page;
@@ -43,6 +44,17 @@ export class PolicyComparisonPage {
     await this.page.goto('/aegis/policy-comparison');
     await this.page.waitForURL(/\/aegis\/policy-comparison/);
     await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectListPage() {
+    await expectPageBaseline(this.page, {
+      url: /\/aegis\/policy-comparison/,
+      visibleText: [/Policy Comparison/i],
+      headings: ['Policy Comparisons'],
+      buttons: [/New/i],
+      textboxes: [/Search by comparison name/i],
+      columnHeaders: ['Account', 'Comparison Name', 'Status', 'E&O Risk', 'Resources', 'Updated', 'Actions']
+    });
   }
 
   async createAccount(accountName: string) {

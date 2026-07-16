@@ -1,34 +1,19 @@
 import { test, expect } from '@playwright/test';
-import { expectPageBaseline } from '../helpers/page-baseline';
 import { AppShellPage } from '../page-objects/app-shell-page';
+import { PolicyComparisonPage } from '../page-objects/policy-comparison-page';
 import { ProposalBuilderPage } from '../page-objects/proposal-builder-page';
 
 test.describe('Navigation smoke @smoke', () => {
   test('policy comparison list page loads', async ({ page }) => {
-    const shell = new AppShellPage(page);
-    await shell.goto('/aegis/policy-comparison');
-
-    await expectPageBaseline(page, {
-      url: /\/aegis\/policy-comparison/,
-      visibleText: [/Policy Comparison/i],
-      headings: ['Policy Comparisons'],
-      buttons: [/New/i],
-      textboxes: [/Search by comparison name/i],
-      columnHeaders: ['Account', 'Comparison Name', 'Status', 'E&O Risk', 'Resources', 'Updated', 'Actions']
-    });
+    const policyPage = new PolicyComparisonPage(page);
+    await policyPage.goto();
+    await policyPage.expectListPage();
   });
 
   test('proposal builder workbench loads', async ({ page }) => {
-    const shell = new AppShellPage(page);
-    await shell.goto('/aegis/proposal-builder');
-
-    await expectPageBaseline(page, {
-      url: /\/aegis\/proposal-builder/,
-      visibleText: [/Proposal Builder/i, /Create and send professional insurance proposals/i],
-      headings: ['Proposals'],
-      buttons: [/New/i],
-      columnHeaders: ['Account', 'Name', 'Status', 'Created', 'Actions']
-    });
+    const proposalPage = new ProposalBuilderPage(page);
+    await proposalPage.goto();
+    await proposalPage.expectListPage();
   });
 
   test('proposal builder opens new proposal account picker', async ({ page }) => {

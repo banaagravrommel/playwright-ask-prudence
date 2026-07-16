@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { expectPageBaseline } from '../helpers/page-baseline';
 
 export class ProposalBuilderPage {
   readonly page: Page;
@@ -23,6 +24,16 @@ export class ProposalBuilderPage {
     await this.page.goto('/aegis/proposal-builder', { timeout: 120000 });
     await this.page.waitForURL(/\/aegis\/proposal-builder/);
     await this.page.waitForLoadState('networkidle');
+  }
+
+  async expectListPage() {
+    await expectPageBaseline(this.page, {
+      url: /\/aegis\/proposal-builder/,
+      visibleText: [/Proposal Builder/i, /Create and send professional insurance proposals/i],
+      headings: ['Proposals'],
+      buttons: [/New/i],
+      columnHeaders: ['Account', 'Name', 'Status', 'Created', 'Actions']
+    });
   }
 
   async openNewProposal() {
