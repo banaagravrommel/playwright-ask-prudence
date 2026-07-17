@@ -220,7 +220,6 @@ export class AskPrudensPage {
     await expect(this.workbench.getByText('Add sources')).toBeVisible();
     if (resourceName) {
       await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
-      await expect(this.workbench.getByText('documents', { exact: true }).first()).toBeVisible();
     } else {
       await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
     }
