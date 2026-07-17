@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { smokeLabel } from '../helpers/smoke-data';
 import {
   IntakeMatchPage,
   UnderwritingCarriersPage,
@@ -25,6 +26,17 @@ test.describe('Underwriting smoke @smoke', () => {
     const packagesPage = new UnderwritingPackagesPage(page);
     await packagesPage.goto();
     await packagesPage.expectListPage();
+  });
+
+  test('packages creates a draft via save package', async ({ page }) => {
+    const packagesPage = new UnderwritingPackagesPage(page);
+    const packageName = smokeLabel('package');
+
+    await packagesPage.goto();
+    await packagesPage.createPackage({
+      name: packageName,
+      purpose: 'Smoke create package'
+    });
   });
 
   test('carriers list page loads', async ({ page }) => {
