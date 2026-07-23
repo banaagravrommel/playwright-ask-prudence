@@ -35,4 +35,16 @@ test.describe('Form Automation smoke @smoke', () => {
     await formFillPage.goto();
     await formFillPage.openNewFormFill();
   });
+
+  test('form fill creates a record via save and cleans up', async ({ page }) => {
+    const formFillPage = new FormFillPage(page);
+    const recordName = smokeLabel('form-fill-record');
+
+    try {
+      await formFillPage.goto();
+      await formFillPage.createFormFillRecord({ name: recordName });
+    } finally {
+      await formFillPage.deleteFormFillRecord(recordName);
+    }
+  });
 });
