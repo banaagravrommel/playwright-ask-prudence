@@ -1,16 +1,27 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/**
+ * Legacy deep-flow specs that target the pre-workbench Proposal Builder /
+ * Policy Comparison UI. Covered by smoke-ai instead. Kept on disk for
+ * reference, but excluded from runs — project-level testIgnore replaces
+ * the root list, so chromium must repeat these patterns.
+ */
+const legacyDeepFlowIgnore = [
+  '**/proposal-builder.spec.ts',
+  '**/proposal-builder-1-create-draft.spec.ts',
+  '**/proposal-builder-2-add-account.spec.ts',
+  '**/proposal-builder-3-select-account.spec.ts',
+  '**/proposal-builder-4-add-purpose.spec.ts',
+  '**/proposal-builder-5-add-resources.spec.ts',
+  '**/proposal-builder-6-generate-proposal.spec.ts',
+  '**/proposal-builder-test.spec.ts',
+  '**/policy-comparison.spec.ts',
+  '**/policy-comparison-test.spec.ts'
+];
+
 export default defineConfig({
   testDir: './tests',
-  testIgnore: [
-    '**/proposal-builder.spec.ts',
-    '**/proposal-builder-1-create-draft.spec.ts',
-    '**/proposal-builder-2-add-account.spec.ts',
-    '**/proposal-builder-3-select-account.spec.ts',
-    '**/proposal-builder-4-add-purpose.spec.ts',
-    '**/proposal-builder-5-add-resources.spec.ts',
-    '**/proposal-builder-6-generate-proposal.spec.ts'
-  ],
+  testIgnore: legacyDeepFlowIgnore,
   timeout: 60 * 1000,
   expect: { timeout: 5000 },
   fullyParallel: true,
@@ -71,7 +82,7 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testIgnore: ['**/smoke/**', '**/proposal-builder-test.spec.ts'],
+      testIgnore: ['**/smoke/**', ...legacyDeepFlowIgnore],
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
