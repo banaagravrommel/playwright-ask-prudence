@@ -10,9 +10,13 @@ test.describe('Ask Prudens AI smoke @smoke-ai', () => {
     const prompt = 'What is general liability insurance in one sentence?';
     const askPage = new AskPrudensPage(page);
 
-    await askPage.goto();
-    await askPage.startAskPrudensChatSession('Demo', sessionTitle);
-    await askPage.sendMessage(prompt);
-    await askPage.expectChatResponse(prompt);
+    try {
+      await askPage.goto();
+      await askPage.startAskPrudensChatSession('Demo', sessionTitle);
+      await askPage.sendMessage(prompt);
+      await askPage.expectChatResponse(prompt);
+    } finally {
+      await askPage.deleteSession(sessionTitle);
+    }
   });
 });

@@ -15,6 +15,7 @@ test.describe('Form Automation smoke @smoke', () => {
     await templatesPage.openAddTemplateEditor();
   });
 
+  // Gap: Form Fill Templates have Edit only — no Delete/Archive UI for cleanup yet.
   test('form fill templates creates a draft via save and edit', async ({ page }) => {
     const templatesPage = new FormFillTemplatesPage(page);
     const templateName = smokeLabel('form-fill-template');

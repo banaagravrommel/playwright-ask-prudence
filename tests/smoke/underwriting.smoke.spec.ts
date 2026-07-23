@@ -32,11 +32,15 @@ test.describe('Underwriting smoke @smoke', () => {
     const packagesPage = new UnderwritingPackagesPage(page);
     const packageName = smokeLabel('package');
 
-    await packagesPage.goto();
-    await packagesPage.createPackage({
-      name: packageName,
-      purpose: 'Smoke create package'
-    });
+    try {
+      await packagesPage.goto();
+      await packagesPage.createPackage({
+        name: packageName,
+        purpose: 'Smoke create package'
+      });
+    } finally {
+      await packagesPage.deletePackage(packageName);
+    }
   });
 
   test('carriers list page loads', async ({ page }) => {

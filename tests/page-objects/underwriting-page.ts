@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { expectPageBaseline } from '../helpers/page-baseline';
+import { deleteRowByName } from '../helpers/smoke-cleanup';
 
 export class IntakeMatchPage {
   readonly page: Page;
@@ -127,6 +128,14 @@ export class UnderwritingPackagesPage {
 
     await expect(this.page.getByRole('button', { name: /Save Package/i })).toBeHidden({ timeout: 15000 });
     await expect(this.page.getByText(name).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deletePackage(name: string) {
+    await this.goto();
+    await this.expectListPage();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete package"]').first()
+    });
   }
 }
 
