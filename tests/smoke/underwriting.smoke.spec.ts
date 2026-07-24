@@ -22,6 +22,19 @@ test.describe('Underwriting smoke @smoke', () => {
     await submissionsPage.expectListPage();
   });
 
+  test('submissions creates a draft via save', async ({ page }) => {
+    const submissionsPage = new UnderwritingSubmissionsPage(page);
+    const purpose = smokeLabel('submission');
+
+    try {
+      await submissionsPage.goto();
+      await submissionsPage.createSubmissionDraft({ purpose });
+      await submissionsPage.expectSubmissionInList(purpose);
+    } finally {
+      await submissionsPage.deleteSubmission(purpose);
+    }
+  });
+
   test('packages list page loads', async ({ page }) => {
     const packagesPage = new UnderwritingPackagesPage(page);
     await packagesPage.goto();

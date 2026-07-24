@@ -46,6 +46,96 @@ export class UnderwritingSubmissionsPage {
       columnHeaders: ['Account', 'Purpose', 'Resources', 'Packages', 'Actions']
     });
   }
+
+  async openNewSubmissionFlow() {
+    await this.page.getByRole('button', { name: /New/i }).first().click();
+    await expect(this.page.getByText(/NEW SUBMISSION WORKFLOW/i)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByPlaceholder(/Search account/i)).toBeVisible();
+    await expect(this.page.locator('button.btn-primary', { hasText: /^Save$/i })).toBeVisible();
+  }
+
+  async selectAccount(searchTerm: string) {
+    const accountSearch = this.page.getByPlaceholder(/Search account/i);
+    await accountSearch.click();
+    await accountSearch.fill('');
+    await accountSearch.fill(searchTerm);
+
+    const menu = this.page.locator('.vs__dropdown-menu').last();
+    const option = menu
+      .locator('li')
+      .filter({ hasNotText: /Sorry, no matching options/i })
+      .filter({ hasText: new RegExp(searchTerm, 'i') })
+      .first();
+    await expect(option).toBeVisible({ timeout: 15000 });
+
+    const exact = menu
+      .locator('li')
+      .filter({ hasNotText: /Sorry, no matching options/i })
+      .filter({ hasText: new RegExp(`^\\s*${searchTerm}\\s*$`, 'i') })
+      .first();
+    if (await exact.isVisible().catch(() => false)) {
+      await exact.click();
+    } else {
+      await option.click();
+    }
+
+    await expect(this.page.locator('.vs__selected').filter({ hasText: new RegExp(searchTerm, 'i') }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async selectFirstResource() {
+    const resourceSearch = this.page.getByPlaceholder(/Select resources/i);
+    await resourceSearch.click();
+
+    const menu = this.page.locator('.vs__dropdown-menu').last();
+    const option = menu.locator('li').filter({ hasNotText: /Sorry, no matching options/i }).first();
+    await expect(option).toBeVisible({ timeout: 15000 });
+    await option.click();
+
+    await expect(this.page.locator('.vs__selected').nth(1)).toBeVisible({ timeout: 15000 });
+  }
+
+  async createSubmissionDraft(options: { purpose: string; accountSearch?: string }) {
+    const accountSearch = options.accountSearch ?? 'QA';
+
+    await this.openNewSubmissionFlow();
+    await this.selectAccount(accountSearch);
+    await this.page.getByPlaceholder(/Describe intent/i).fill(options.purpose);
+    await expect(this.page.getByPlaceholder(/Describe intent/i)).toHaveValue(options.purpose);
+    await this.selectFirstResource();
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/form-submissions\/submissions\/records\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    await this.page.locator('button.btn-primary', { hasText: /^Save$/i }).click();
+    await saveResponse;
+
+    await expect(this.page.getByText(/Submission workflow saved/i)).toBeVisible({ timeout: 30000 });
+    const okButton = this.page.getByRole('button', { name: /^OK$/i });
+    if (await okButton.isVisible().catch(() => false)) {
+      await okButton.click();
+    }
+  }
+
+  async expectSubmissionInList(purpose: string) {
+    await this.goto();
+    await this.expectListPage();
+    await expect(this.page.getByRole('row').filter({ hasText: purpose }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteSubmission(purpose: string) {
+    await this.goto();
+    await this.expectListPage();
+    await deleteRowByName(this.page, purpose, {
+      deleteButton: (row) => row.locator('button.btn-outline-danger, button:has(.fa-trash)').first()
+    });
+  }
 }
 
 export class UnderwritingPackagesPage {
