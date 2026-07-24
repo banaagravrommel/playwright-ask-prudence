@@ -18,12 +18,16 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const formName = smokeLabel('form');
 
-    await settingsPage.goto('forms');
-    await settingsPage.openNewFormEditor();
-    await settingsPage.createForm({
-      name: formName,
-      description: 'Smoke test form created by Playwright.'
-    });
+    try {
+      await settingsPage.goto('forms');
+      await settingsPage.openNewFormEditor();
+      await settingsPage.createForm({
+        name: formName,
+        description: 'Smoke test form created by Playwright.'
+      });
+    } finally {
+      await settingsPage.deleteForm(formName);
+    }
   });
 
   test('settings escalation groups section loads and opens add group editor', async ({ page }) => {

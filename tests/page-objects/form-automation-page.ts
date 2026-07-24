@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { expectPageBaseline } from '../helpers/page-baseline';
+import { confirmDestructiveAction } from '../helpers/smoke-cleanup';
 
 export class FormFillTemplatesPage {
   readonly page: Page;
@@ -87,6 +88,153 @@ export class FormFillPage {
       timeout: 15000
     });
     await expect(this.page.getByPlaceholder(/e.g. Renewal Packet/i)).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Save/i }).first()).toBeVisible();
+    await expect(this.page.locator('button.btn-primary', { hasText: /^Save$/ })).toBeVisible();
+  }
+
+  async selectAccount(searchTerm: string) {
+    const accountSearch = this.page.getByPlaceholder(/Search for an account/i);
+    await accountSearch.fill(searchTerm);
+
+    await this.page.waitForResponse(
+      (response) => /\/accounts\/search/.test(response.url()) && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    const option = this.page
+      .locator('.vs__dropdown-menu li')
+      .filter({ hasText: new RegExp(searchTerm, 'i') })
+      .first();
+    await expect(option).toBeVisible({ timeout: 15000 });
+
+    const accountName = ((await option.textContent()) ?? '').trim();
+    await option.click();
+    await expect(this.page.locator('.vs__selected').filter({ hasText: accountName }).first()).toBeVisible();
+    return accountName;
+  }
+
+  async selectFirstTemplate() {
+    const templateSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select template/i }) })
+      .first();
+    const optionLabels = await templateSelect.locator('option').allTextContents();
+    const templateLabel = optionLabels
+      .map((label) => label.trim())
+      .find((label) => label && !/Select template/i.test(label));
+    expect(templateLabel, 'expected at least one form fill template').toBeTruthy();
+
+    await templateSelect.selectOption({ label: templateLabel! });
+
+    const templateName = templateLabel!.replace(/\s*\((HTML|PDF)\)\s*$/i, '').trim();
+    await expect(this.page.getByRole('heading', { name: /Form Fields/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('button', { name: /Refresh Preview/i })).toBeVisible();
+
+    return { templateLabel: templateLabel!, templateName };
+  }
+
+  async createFormFillRecord(options: { name: string; accountSearch?: string }) {
+    await this.openNewFormFill();
+
+    const nameInput = this.page.getByPlaceholder(/e.g. Renewal Packet/i);
+    await nameInput.fill(options.name);
+    await expect(nameInput).toHaveValue(options.name);
+
+    const accountName = await this.selectAccount(options.accountSearch ?? 'test');
+    const { templateName } = await this.selectFirstTemplate();
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/form-fill\/records\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    await this.page.locator('button.btn-primary', { hasText: /^Save$/ }).click();
+    await saveResponse;
+    await this.expectRecordVisible({ accountName, templateName });
+    await this.expectRecordSavedByName(options.name);
+
+    return { accountName, templateName };
+  }
+
+  async expectRecordVisible(options: { accountName: string; templateName: string }) {
+    await expect(this.page.getByRole('heading', { name: /Form Fill Records/i })).toBeVisible({
+      timeout: 15000
+    });
+    const row = this.page
+      .getByRole('row')
+      .filter({ hasText: options.accountName })
+      .filter({ hasText: options.templateName })
+      .first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+  }
+
+  private dataRows() {
+    return this.page.locator('table tbody tr').filter({ has: this.page.locator('button.btn-outline-danger') });
+  }
+
+  async expectRecordSavedByName(recordName: string) {
+    const index = await this.findRecordIndexByName(recordName);
+    expect(index, `expected form fill record "${recordName}" to be saved`).toBeGreaterThanOrEqual(0);
+  }
+
+  private async cancelRecordEditor() {
+    await this.page.locator('button.btn-secondary.btn-sm', { hasText: /^Cancel$/i }).click();
+    await expect(this.page.getByRole('heading', { name: /Form Fill Records/i })).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async findRecordIndexByName(recordName: string) {
+    const rows = this.dataRows();
+    const count = await rows.count();
+
+    for (let i = 0; i < count; i++) {
+      await rows.nth(i).locator('button:has(.fa-edit)').click();
+      await expect(this.page.getByRole('heading', { name: /Edit Form Fill Record/i })).toBeVisible({
+        timeout: 15000
+      });
+
+      const currentName = await this.page.getByPlaceholder(/e.g. Renewal Packet/i).inputValue();
+      await this.cancelRecordEditor();
+
+      if (currentName === recordName) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  async deleteFormFillRecord(recordName: string) {
+    await this.goto();
+    await this.expectListPage();
+
+    const rows = this.dataRows();
+    const count = await rows.count();
+
+    for (let i = 0; i < count; i++) {
+      await rows.nth(i).locator('button:has(.fa-edit)').click();
+      await expect(this.page.getByRole('heading', { name: /Edit Form Fill Record/i })).toBeVisible({
+        timeout: 15000
+      });
+
+      const currentName = await this.page.getByPlaceholder(/e.g. Renewal Packet/i).inputValue();
+      await this.cancelRecordEditor();
+
+      if (currentName !== recordName) {
+        continue;
+      }
+
+      await confirmDestructiveAction(this.page, async () => {
+        await this.dataRows().nth(i).locator('button.btn-outline-danger').click();
+      });
+
+      await expect(this.dataRows()).toHaveCount(count - 1, { timeout: 15000 });
+      return;
+    }
+
+    throw new Error(`Form fill record not found for cleanup: ${recordName}`);
   }
 }

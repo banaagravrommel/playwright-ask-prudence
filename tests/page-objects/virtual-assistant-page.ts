@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { expectPageBaseline } from '../helpers/page-baseline';
+import { confirmDestructiveAction, deleteRowByName } from '../helpers/smoke-cleanup';
 
 export class VirtualAssistantPage {
   readonly page: Page;
@@ -81,6 +82,15 @@ export class VirtualAssistantPage {
     await saveButton.click();
     await expect(this.page.getByRole('heading', { name: 'Company SOPs' })).toBeVisible({ timeout: 15000 });
     await expect(this.page.getByRole('row').filter({ hasText: options.title }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteSop(title: string) {
+    await this.goto();
+    await this.goToSops();
+    await this.expectSopsPage();
+    await deleteRowByName(this.page, title, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async openFirstActiveAssistant() {
@@ -334,6 +344,30 @@ export class AskPrudensPage {
       await expect(workbench.getByRole('textbox').first()).toBeVisible();
     }
   }
+
+  async deleteSession(title: string) {
+    await this.goto();
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+
+    const searchSessions = this.page.getByRole('textbox', { name: /Search sessions/i });
+    await searchSessions.fill(title);
+    await this.page.waitForTimeout(1000);
+
+    const sessionItem = this.workbench.locator('li.aw-nav__item.aw-nav__item--nested').filter({ hasText: title }).first();
+    await expect(sessionItem).toHaveCount(1, { timeout: 15000 });
+
+    await confirmDestructiveAction(this.page, async () => {
+      // Nested chat delete control is CSS-hidden until hover; invoke click in DOM.
+      await sessionItem.locator('button.aw-nav__del').evaluate((button) => {
+        (button as HTMLElement).click();
+      });
+    });
+
+    await expect(this.workbench.locator('li.aw-nav__item.aw-nav__item--nested').filter({ hasText: title })).toHaveCount(0, {
+      timeout: 15000
+    });
+  }
 }
 
 export class VirtualAssistantObserversPage {
@@ -379,6 +413,14 @@ export class VirtualAssistantObserversPage {
     await expect(savedDialog).toBeHidden();
 
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteObserver(name: string) {
+    await this.goto();
+    await this.expectObserversPage();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.getByRole('button', { name: /Delete observer/i })
+    });
   }
 }
 
@@ -483,6 +525,14 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
   }
 
+  async deleteForm(name: string) {
+    await this.goto('forms');
+    await this.expectFormsSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
   async openAddKnowledgeBaseEditor() {
     await this.page.getByRole('button', { name: /Add Knowledge Base/i }).click();
     await expect(this.page.getByPlaceholder(/Product Documentation/i)).toBeVisible();
@@ -498,6 +548,14 @@ export class VirtualAssistantSettingsPage {
     await saveButton.click();
     await expect(this.page.getByRole('heading', { name: 'Knowledge Bases' })).toBeVisible({ timeout: 15000 });
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteKnowledgeBase(name: string) {
+    await this.goto();
+    await this.expectKnowledgeBasesSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async openAddToolEditor() {
@@ -517,6 +575,14 @@ export class VirtualAssistantSettingsPage {
     await saveButton.click();
     await expect(this.page.getByRole('heading', { name: 'Agent Tools' })).toBeVisible({ timeout: 15000 });
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteTool(name: string) {
+    await this.goto('tools');
+    await this.expectToolsSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button.btn-outline-danger, button:has(.fa-trash)').first()
+    });
   }
 
   async expectTriggerAdminSection() {
