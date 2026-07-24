@@ -16,6 +16,24 @@ test.describe('Underwriting smoke @smoke', () => {
     await intakePage.expectListPage();
   });
 
+  test('intake match creates a draft via create session', async ({ page }) => {
+    const intakePage = new IntakeMatchPage(page);
+    const intakeTitle = smokeLabel('intake');
+
+    try {
+      await intakePage.goto();
+      await intakePage.createIntakeDraft({
+        accountName: 'QA',
+        title: intakeTitle,
+        agent: 'Demo',
+        productLine: 'General Liability'
+      });
+      await intakePage.expectIntakeInList(intakeTitle);
+    } finally {
+      await intakePage.deleteIntake(intakeTitle);
+    }
+  });
+
   test('submissions list page loads', async ({ page }) => {
     const submissionsPage = new UnderwritingSubmissionsPage(page);
     await submissionsPage.goto();

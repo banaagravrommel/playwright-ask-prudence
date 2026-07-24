@@ -23,6 +23,96 @@ export class IntakeMatchPage {
       columnHeaders: ['Account', 'Purpose', 'Product', 'Carriers', 'Actions']
     });
   }
+
+  async openNewIntakeFlow() {
+    await this.page.getByRole('button', { name: /New/i }).first().click();
+    await expect(this.page.getByRole('heading', { name: /Pick an account for "Intake Match"/i })).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async pickAccount(accountName: string) {
+    await this.page.getByRole('textbox', { name: /Search accounts/i }).fill(accountName);
+    await this.page.waitForTimeout(1500);
+
+    const accountRow = this.page
+      .getByRole('row')
+      .filter({ has: this.page.getByRole('cell', { name: accountName, exact: true }) })
+      .first();
+    await expect(accountRow).toBeVisible({ timeout: 15000 });
+
+    const selectButton = accountRow.getByRole('button', { name: /Select/i });
+    if (await selectButton.isVisible().catch(() => false)) {
+      await selectButton.click();
+    } else {
+      await accountRow.click();
+    }
+
+    await expect(this.page.getByRole('heading', { name: new RegExp(`Intake Match — ${accountName}`, 'i') })).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async createIntakeDraft(options: {
+    accountName?: string;
+    title: string;
+    agent?: string;
+    productLine?: string;
+  }) {
+    const accountName = options.accountName ?? 'QA';
+    const agent = options.agent ?? 'Demo';
+    const productLine = options.productLine ?? 'General Liability';
+
+    await this.openNewIntakeFlow();
+    await this.pickAccount(accountName);
+
+    const agentSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select agent/i }) })
+      .first();
+    await agentSelect.selectOption({ label: agent });
+
+    const titleInput = this.page.getByPlaceholder(/Optional title/i);
+    await titleInput.fill(options.title);
+    await expect(titleInput).toHaveValue(options.title);
+
+    const productCheckbox = this.page.getByRole('checkbox', { name: new RegExp(productLine, 'i') });
+    if (await productCheckbox.count()) {
+      await productCheckbox.check({ force: true });
+    }
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/quoting\/ai-sessions\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const createButton = this.page.getByRole('button', { name: /Create Session/i });
+    await expect(createButton).toBeEnabled({ timeout: 15000 });
+    await createButton.click();
+    await saveResponse;
+
+    const sessionBanner = this.page.getByRole('banner').filter({ hasText: options.title }).first();
+    await expect(sessionBanner).toBeVisible({ timeout: 30000 });
+    await expect(sessionBanner).toContainText(/draft/i);
+    await expect(sessionBanner.getByRole('button', { name: 'Chat' })).toBeVisible();
+  }
+
+  async expectIntakeInList(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await expect(this.page.getByRole('row').filter({ hasText: title }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteIntake(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await deleteRowByName(this.page, title, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
 }
 
 export class UnderwritingSubmissionsPage {
