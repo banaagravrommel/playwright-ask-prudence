@@ -81,6 +81,19 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     }
   });
 
+  test('settings creates a trigger and cleans up', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const triggerName = smokeLabel('trigger');
+
+    try {
+      await settingsPage.gotoTriggerAdmin();
+      await settingsPage.createTrigger({ name: triggerName });
+      await settingsPage.expectTriggerInList(triggerName);
+    } finally {
+      await settingsPage.deleteTrigger(triggerName);
+    }
+  });
+
   test('settings simulate situations tab shows agents table', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto('simulate');
