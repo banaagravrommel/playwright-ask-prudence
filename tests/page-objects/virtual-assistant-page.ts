@@ -598,6 +598,104 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('heading', { name: 'New Trigger' })).toBeVisible();
     await expect(this.page.getByPlaceholder(/New account workflow handoff/i)).toBeVisible();
     await expect(this.page.getByPlaceholder(/Describe the trigger behavior/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Trigger/i })).toBeVisible();
+  }
+
+  async createTrigger(options: {
+    name: string;
+    description?: string;
+    model?: string;
+    status?: string;
+    schemaLabel?: string;
+  }) {
+    await this.openNewTriggerEditor();
+
+    await this.page.getByPlaceholder(/New account workflow handoff/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/New account workflow handoff/i)).toHaveValue(options.name);
+
+    const description = options.description ?? 'Smoke test trigger created by Playwright.';
+    await this.page.getByPlaceholder(/Describe the trigger behavior/i).fill(description);
+
+    const modelSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^New$/i }) })
+      .first();
+    await modelSelect.selectOption({ label: options.model ?? 'New' });
+
+    const statusSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^Active$/i }) })
+      .first();
+    await statusSelect.selectOption({ label: options.status ?? 'Active' });
+
+    const schemaSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select schema/i }) })
+      .first();
+    await expect(schemaSelect).toBeVisible({ timeout: 15000 });
+    await expect
+      .poll(async () => schemaSelect.locator('option').count(), { timeout: 30000 })
+      .toBeGreaterThan(1);
+
+    const schemaLabels = (await schemaSelect.locator('option').allTextContents()).map((label) => label.trim());
+    const schemaLabel =
+      options.schemaLabel ??
+      schemaLabels.find((label) => /^TestSchema$/i.test(label)) ??
+      schemaLabels.find((label) => /^QA Test$/i.test(label)) ??
+      schemaLabels.find((label) => label && !/Select schema/i.test(label));
+    expect(schemaLabel, 'expected at least one schema option').toBeTruthy();
+    await schemaSelect.selectOption({ label: schemaLabel! });
+
+    const integrationSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select integration/i }) })
+      .first();
+    await expect(integrationSelect).toBeVisible({ timeout: 15000 });
+    await expect
+      .poll(async () => integrationSelect.locator('option').count(), { timeout: 30000 })
+      .toBeGreaterThan(1);
+
+    const integrationLabels = (await integrationSelect.locator('option').allTextContents()).map((label) =>
+      label.trim()
+    );
+    const integrationLabel = integrationLabels.find((label) => label && !/Select integration/i.test(label));
+    expect(integrationLabel, 'expected at least one integration option').toBeTruthy();
+    await integrationSelect.selectOption({ label: integrationLabel! });
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/virtual-assistant\/triggers\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    await this.page.getByRole('button', { name: /Save Trigger/i }).click();
+    await saveResponse;
+
+    const okButton = this.page.getByRole('button', { name: /^OK$/i });
+    if (await okButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await okButton.click();
+    }
+
+    await expect(this.page.getByRole('heading', { name: 'Triggers' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectTriggerInList(name: string) {
+    await this.gotoTriggerAdmin();
+    await this.expectTriggerAdminSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteTrigger(name: string) {
+    await this.gotoTriggerAdmin();
+    await this.expectTriggerAdminSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async expectVerificationsSection() {
