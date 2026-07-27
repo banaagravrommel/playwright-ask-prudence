@@ -46,6 +46,23 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.openAddTransferEditor();
   });
 
+  test('settings creates a transfer and cleans up', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const transferName = smokeLabel('transfer');
+
+    try {
+      await settingsPage.goto('escalations');
+      await settingsPage.goToEscalationsSubSection('Transfers');
+      await settingsPage.createTransfer({
+        name: transferName,
+        when: 'Smoke test: transfer created by Playwright.'
+      });
+      await settingsPage.expectTransferInList(transferName);
+    } finally {
+      await settingsPage.deleteTransfer(transferName);
+    }
+  });
+
   test('settings simulate situations tab shows agents table', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto('simulate');
