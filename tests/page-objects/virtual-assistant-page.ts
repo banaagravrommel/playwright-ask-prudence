@@ -649,6 +649,62 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('button', { name: /Save Group/i })).toBeVisible();
   }
 
+  async createEscalationGroup(options: { name: string; when: string; emails?: string }) {
+    await this.openAddEscalationGroupEditor();
+
+    await this.page.getByPlaceholder(/e\.g\., Support Team/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/e\.g\., Support Team/i)).toHaveValue(options.name);
+
+    if (options.emails) {
+      await this.page.getByPlaceholder(/john@example.com/i).fill(options.emails);
+    }
+
+    await this.page.getByPlaceholder(/Describe when this group should be escalated/i).fill(options.when);
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/escalation-groups\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Group/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    const successDialog = this.page.getByRole('dialog').filter({ hasText: /success|saved|created/i });
+    if (await successDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await successDialog.getByRole('button', { name: /^OK$/i }).click();
+    } else {
+      const okButton = this.page.getByRole('button', { name: /^OK$/i });
+      if (await okButton.isVisible().catch(() => false)) {
+        await okButton.click();
+      }
+    }
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectEscalationGroupInList(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Escalation Groups');
+    await this.expectEscalationGroupsSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteEscalationGroup(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Escalation Groups');
+    await this.expectEscalationGroupsSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
   async expectTransfersSection() {
     await expect(this.page.getByRole('button', { name: /Add Transfer/i })).toBeVisible();
     await expect(this.page.getByRole('columnheader', { name: 'Type' })).toBeVisible();

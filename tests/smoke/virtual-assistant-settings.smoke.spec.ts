@@ -38,6 +38,24 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.openAddEscalationGroupEditor();
   });
 
+  test('settings creates an escalation group and cleans up', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const groupName = smokeLabel('escalation-group');
+
+    try {
+      await settingsPage.goto('escalations');
+      await settingsPage.goToEscalationsSubSection('Escalation Groups');
+      await settingsPage.createEscalationGroup({
+        name: groupName,
+        emails: 'smoke-escalation@example.com',
+        when: 'Smoke test: escalate when Playwright creates a draft escalation group.'
+      });
+      await settingsPage.expectEscalationGroupInList(groupName);
+    } finally {
+      await settingsPage.deleteEscalationGroup(groupName);
+    }
+  });
+
   test('settings transfers section loads and opens add transfer editor', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto('escalations');
