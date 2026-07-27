@@ -44,6 +44,110 @@ export class VirtualAssistantPage {
     await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toBeVisible();
   }
 
+  async createAssistant(options: { name: string; overview?: string }) {
+    await this.openNewAssistantEditor();
+
+    const nameInput = this.page.getByRole('textbox', { name: /Enter assistant name/i });
+    await nameInput.fill(options.name);
+    await expect(nameInput).toHaveValue(options.name);
+
+    const overview = options.overview ?? 'Smoke test assistant created by Playwright.';
+    const overviewInput = this.page.getByPlaceholder(/Describe what this assistant does/i);
+    if (await overviewInput.isVisible().catch(() => false)) {
+      await overviewInput.fill(overview);
+    }
+
+    const saveResponsePromise = this.page.waitForResponse(
+      (response) =>
+        /\/virtual-assistant\/assistants\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Assistant/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    const saveResponse = await saveResponsePromise;
+
+    let assistantId: string | number | undefined;
+    try {
+      const body = await saveResponse.json();
+      assistantId = body?.assistant?.id ?? body?.id ?? body?.data?.id ?? body?.assistant_id;
+    } catch {
+      assistantId = undefined;
+    }
+
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toHaveValue(options.name, {
+      timeout: 15000
+    });
+
+    return { assistantId };
+  }
+
+  async expectAssistantInList(name: string) {
+    await this.goto();
+    await this.expectListPage();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assistants expose View/Edit only — no Delete UI, and DELETE /assistants/:id returns 405.
+   * Teardown deactivates via Save PUT (status=inactive), the supported cleanup path.
+   */
+  async deleteAssistant(options: { name: string; assistantId?: string | number }) {
+    await this.goto();
+    await this.expectListPage();
+
+    const row = this.page.getByRole('row').filter({ hasText: options.name }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('button:has(.fa-edit), button.btn-outline-secondary').click();
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toHaveValue(options.name, {
+      timeout: 15000
+    });
+
+    const assistantId = options.assistantId;
+    const routePattern = assistantId
+      ? `**/virtual-assistant/assistants/${assistantId}`
+      : '**/virtual-assistant/assistants/**';
+
+    await this.page.route(routePattern, async (route) => {
+      if (route.request().method() === 'PUT') {
+        const data = JSON.parse(route.request().postData() || '{}');
+        data.status = 'inactive';
+        await route.continue({ postData: JSON.stringify(data) });
+        return;
+      }
+      await route.continue();
+    });
+
+    try {
+      const overviewInput = this.page.getByPlaceholder(/Describe what this assistant does/i);
+      if (await overviewInput.isVisible().catch(() => false)) {
+        await overviewInput.fill('Deactivated by Playwright smoke cleanup.');
+      }
+
+      const saveResponse = this.page.waitForResponse(
+        (response) =>
+          /\/virtual-assistant\/assistants\//.test(response.url()) &&
+          response.request().method() === 'PUT' &&
+          response.status() === 200,
+        { timeout: 30000 }
+      );
+
+      await this.page.getByRole('button', { name: /Save Assistant/i }).click();
+      await saveResponse;
+    } finally {
+      await this.page.unroute(routePattern);
+    }
+
+    await this.goto();
+    await this.expectListPage();
+    const deactivatedRow = this.page.getByRole('row').filter({ hasText: options.name }).first();
+    await expect(deactivatedRow).toBeVisible({ timeout: 15000 });
+    await expect(deactivatedRow).toContainText(/INACTIVE/i);
+  }
+
   async goToAskPrudens() {
     await this.askPrudensLink.first().click();
     await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
@@ -747,6 +851,62 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('button', { name: /Save Group/i })).toBeVisible();
   }
 
+  async createEscalationGroup(options: { name: string; when: string; emails?: string }) {
+    await this.openAddEscalationGroupEditor();
+
+    await this.page.getByPlaceholder(/e\.g\., Support Team/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/e\.g\., Support Team/i)).toHaveValue(options.name);
+
+    if (options.emails) {
+      await this.page.getByPlaceholder(/john@example.com/i).fill(options.emails);
+    }
+
+    await this.page.getByPlaceholder(/Describe when this group should be escalated/i).fill(options.when);
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/escalation-groups\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Group/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    const successDialog = this.page.getByRole('dialog').filter({ hasText: /success|saved|created/i });
+    if (await successDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await successDialog.getByRole('button', { name: /^OK$/i }).click();
+    } else {
+      const okButton = this.page.getByRole('button', { name: /^OK$/i });
+      if (await okButton.isVisible().catch(() => false)) {
+        await okButton.click();
+      }
+    }
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectEscalationGroupInList(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Escalation Groups');
+    await this.expectEscalationGroupsSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteEscalationGroup(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Escalation Groups');
+    await this.expectEscalationGroupsSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
   async expectTransfersSection() {
     await expect(this.page.getByRole('button', { name: /Add Transfer/i })).toBeVisible();
     await expect(this.page.getByRole('columnheader', { name: 'Type' })).toBeVisible();
@@ -758,6 +918,89 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByText(/Add Transfer|Edit Transfer/i).first()).toBeVisible();
     await expect(this.page.getByText(/Transfer Type/i)).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Save Transfer/i })).toBeVisible();
+  }
+
+  async createTransfer(options: {
+    name: string;
+    when: string;
+    number?: string;
+    type?: 'Person' | 'Ring Group';
+    timezone?: string;
+  }) {
+    await this.openAddTransferEditor();
+
+    const type = options.type ?? 'Person';
+    const typeSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^Person$/i }) })
+      .first();
+    await typeSelect.selectOption({ label: type });
+
+    await this.page.getByPlaceholder(/e\.g\., John Smith or Sales Team/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/e\.g\., John Smith or Sales Team/i)).toHaveValue(options.name);
+
+    const number = options.number ?? '1001';
+    const numberInput = this.page.getByPlaceholder(/Enter number/i);
+    await numberInput.fill(number);
+    const addNumberButton = numberInput
+      .locator('xpath=ancestor::*[self::div or self::form][1]//button[contains(., "Add")]')
+      .first();
+    await addNumberButton.click();
+    await expect(this.page.getByText(number).first()).toBeVisible({ timeout: 5000 });
+
+    const timezone = options.timezone ?? 'Eastern Time (ET)';
+    const tzSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select timezone/i }) })
+      .first();
+    if (await tzSelect.isVisible().catch(() => false)) {
+      await tzSelect.selectOption({ label: timezone });
+    }
+
+    await this.page.getByPlaceholder(/Describe when this transfer should be used/i).fill(options.when);
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/transfers\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Transfer/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    const successDialog = this.page.getByRole('dialog').filter({ hasText: /success|saved|created/i });
+    if (await successDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await successDialog.getByRole('button', { name: /^OK$/i }).click();
+    } else {
+      const okButton = this.page.getByRole('button', { name: /^OK$/i });
+      if (await okButton.isVisible().catch(() => false)) {
+        await okButton.click();
+      }
+    }
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectTransferInList(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Transfers');
+    await this.expectTransfersSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteTransfer(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Transfers');
+    await this.expectTransfersSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   simulateSubNavLink(name: 'Situations' | 'Test') {

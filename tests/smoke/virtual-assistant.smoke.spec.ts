@@ -31,6 +31,22 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await expect(page.getByRole('button', { name: /Preview Voice/i })).toBeVisible();
   });
 
+  // Gap: Assistants have View/Edit only — no Delete UI (API DELETE returns 405).
+  // Cleanup deactivates the created assistant (status=inactive) after verify.
+  test('creates a draft assistant via save assistant', async ({ page }) => {
+    const vaPage = new VirtualAssistantPage(page);
+    const assistantName = smokeLabel('assistant');
+    let assistantId: string | number | undefined;
+
+    try {
+      await vaPage.goto();
+      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+      await vaPage.expectAssistantInList(assistantName);
+    } finally {
+      await vaPage.deleteAssistant({ name: assistantName, assistantId });
+    }
+  });
+
   test('observers page loads from module sub-navigation', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     await vaPage.goto();
