@@ -662,6 +662,89 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('button', { name: /Save Transfer/i })).toBeVisible();
   }
 
+  async createTransfer(options: {
+    name: string;
+    when: string;
+    number?: string;
+    type?: 'Person' | 'Ring Group';
+    timezone?: string;
+  }) {
+    await this.openAddTransferEditor();
+
+    const type = options.type ?? 'Person';
+    const typeSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^Person$/i }) })
+      .first();
+    await typeSelect.selectOption({ label: type });
+
+    await this.page.getByPlaceholder(/e\.g\., John Smith or Sales Team/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/e\.g\., John Smith or Sales Team/i)).toHaveValue(options.name);
+
+    const number = options.number ?? '1001';
+    const numberInput = this.page.getByPlaceholder(/Enter number/i);
+    await numberInput.fill(number);
+    const addNumberButton = numberInput
+      .locator('xpath=ancestor::*[self::div or self::form][1]//button[contains(., "Add")]')
+      .first();
+    await addNumberButton.click();
+    await expect(this.page.getByText(number).first()).toBeVisible({ timeout: 5000 });
+
+    const timezone = options.timezone ?? 'Eastern Time (ET)';
+    const tzSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /Select timezone/i }) })
+      .first();
+    if (await tzSelect.isVisible().catch(() => false)) {
+      await tzSelect.selectOption({ label: timezone });
+    }
+
+    await this.page.getByPlaceholder(/Describe when this transfer should be used/i).fill(options.when);
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/transfers\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Transfer/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    const successDialog = this.page.getByRole('dialog').filter({ hasText: /success|saved|created/i });
+    if (await successDialog.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await successDialog.getByRole('button', { name: /^OK$/i }).click();
+    } else {
+      const okButton = this.page.getByRole('button', { name: /^OK$/i });
+      if (await okButton.isVisible().catch(() => false)) {
+        await okButton.click();
+      }
+    }
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectTransferInList(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Transfers');
+    await this.expectTransfersSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteTransfer(name: string) {
+    await this.goto('escalations');
+    await this.goToEscalationsSubSection('Transfers');
+    await this.expectTransfersSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
   simulateSubNavLink(name: 'Situations' | 'Test') {
     return this.page.locator('a.nav-link').filter({ hasText: new RegExp(`^\\s*${name}\\s*$`) }).first();
   }
