@@ -1,0 +1,16 @@
+---
+description: Always branch and push finished Playwright/test-case work
+alwaysApply: true
+---
+
+# Test Case Branch + Push
+
+For Playwright smoke specs, page-object helpers, and other QA test-case work:
+
+- **Do not** leave finished work only in the working tree or stash.
+- At start of implementation: create a focused branch from latest `main` (e.g. `feat/<area>-smoke`).
+- When the ticket’s smoke is implemented and the targeted test passes: **commit and push** the branch (`git push -u origin HEAD`) without waiting to be asked.
+- Then open a PR (or offer the PR URL immediately after push if PR creation needs confirmation).
+- One ticket / one page-feature per branch+PR. Do not pile PW-0xx tickets onto one branch.
+- Never commit or push secrets (`.env`, credentials).
+---
