@@ -44,6 +44,110 @@ export class VirtualAssistantPage {
     await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toBeVisible();
   }
 
+  async createAssistant(options: { name: string; overview?: string }) {
+    await this.openNewAssistantEditor();
+
+    const nameInput = this.page.getByRole('textbox', { name: /Enter assistant name/i });
+    await nameInput.fill(options.name);
+    await expect(nameInput).toHaveValue(options.name);
+
+    const overview = options.overview ?? 'Smoke test assistant created by Playwright.';
+    const overviewInput = this.page.getByPlaceholder(/Describe what this assistant does/i);
+    if (await overviewInput.isVisible().catch(() => false)) {
+      await overviewInput.fill(overview);
+    }
+
+    const saveResponsePromise = this.page.waitForResponse(
+      (response) =>
+        /\/virtual-assistant\/assistants\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Assistant/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    const saveResponse = await saveResponsePromise;
+
+    let assistantId: string | number | undefined;
+    try {
+      const body = await saveResponse.json();
+      assistantId = body?.assistant?.id ?? body?.id ?? body?.data?.id ?? body?.assistant_id;
+    } catch {
+      assistantId = undefined;
+    }
+
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toHaveValue(options.name, {
+      timeout: 15000
+    });
+
+    return { assistantId };
+  }
+
+  async expectAssistantInList(name: string) {
+    await this.goto();
+    await this.expectListPage();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assistants expose View/Edit only — no Delete UI, and DELETE /assistants/:id returns 405.
+   * Teardown deactivates via Save PUT (status=inactive), the supported cleanup path.
+   */
+  async deleteAssistant(options: { name: string; assistantId?: string | number }) {
+    await this.goto();
+    await this.expectListPage();
+
+    const row = this.page.getByRole('row').filter({ hasText: options.name }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('button:has(.fa-edit), button.btn-outline-secondary').click();
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toHaveValue(options.name, {
+      timeout: 15000
+    });
+
+    const assistantId = options.assistantId;
+    const routePattern = assistantId
+      ? `**/virtual-assistant/assistants/${assistantId}`
+      : '**/virtual-assistant/assistants/**';
+
+    await this.page.route(routePattern, async (route) => {
+      if (route.request().method() === 'PUT') {
+        const data = JSON.parse(route.request().postData() || '{}');
+        data.status = 'inactive';
+        await route.continue({ postData: JSON.stringify(data) });
+        return;
+      }
+      await route.continue();
+    });
+
+    try {
+      const overviewInput = this.page.getByPlaceholder(/Describe what this assistant does/i);
+      if (await overviewInput.isVisible().catch(() => false)) {
+        await overviewInput.fill('Deactivated by Playwright smoke cleanup.');
+      }
+
+      const saveResponse = this.page.waitForResponse(
+        (response) =>
+          /\/virtual-assistant\/assistants\//.test(response.url()) &&
+          response.request().method() === 'PUT' &&
+          response.status() === 200,
+        { timeout: 30000 }
+      );
+
+      await this.page.getByRole('button', { name: /Save Assistant/i }).click();
+      await saveResponse;
+    } finally {
+      await this.page.unroute(routePattern);
+    }
+
+    await this.goto();
+    await this.expectListPage();
+    const deactivatedRow = this.page.getByRole('row').filter({ hasText: options.name }).first();
+    await expect(deactivatedRow).toBeVisible({ timeout: 15000 });
+    await expect(deactivatedRow).toContainText(/INACTIVE/i);
+  }
+
   async goToAskPrudens() {
     await this.askPrudensLink.first().click();
     await expect(this.page).toHaveURL(/\/virtual-assistant\/ask-prudens/);
