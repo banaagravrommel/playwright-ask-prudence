@@ -203,6 +203,110 @@ export class VirtualAssistantPage {
     await expect(this.page.getByRole('button', { name: /Save Assistant/i })).toBeVisible({ timeout: 15000 });
     await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toBeVisible();
   }
+
+  async openAssistantEditor(name: string) {
+    const row = this.page.getByRole('row').filter({ hasText: name }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('button:has(.fa-edit), button.btn-outline-secondary').click();
+    await expect(this.page.getByRole('textbox', { name: /Enter assistant name/i })).toHaveValue(name, {
+      timeout: 15000
+    });
+    await expect(this.page.getByRole('button', { name: /Save Assistant/i })).toBeVisible();
+  }
+
+  async openActivitiesTab() {
+    await this.page.getByRole('tab', { name: 'Activities' }).click();
+    await expect(this.page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible({
+      timeout: 15000
+    });
+    await expect(this.page.getByRole('button', { name: /Add Activity/i })).toBeVisible();
+    await expect(
+      this.page.getByRole('columnheader', { name: 'Channel' }).or(this.page.getByRole('heading', { name: /No Activities Configured/i }))
+    ).toBeVisible();
+  }
+
+  async openAddActivityEditor() {
+    await this.page.getByRole('button', { name: /Add Activity/i }).click();
+    await expect(this.page.getByRole('heading', { name: 'New Activity' })).toBeVisible();
+    await expect(this.page.getByRole('textbox', { name: /Handle Inbound Emails/i })).toBeVisible();
+    await expect(this.page.getByText(/Channel Type/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Activity/i })).toBeVisible();
+  }
+
+  async createActivity(options: {
+    name: string;
+    channel?: string;
+    sop?: string;
+    description?: string;
+  }) {
+    await this.openAddActivityEditor();
+
+    const nameInput = this.page.getByRole('textbox', { name: /Handle Inbound Emails/i });
+    await nameInput.fill(options.name);
+    await expect(nameInput).toHaveValue(options.name);
+
+    const channel = options.channel ?? 'Send Text/SMS';
+    await this.page.getByText(channel, { exact: true }).click();
+
+    const sopSelect = this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /No SOP selected/i }) })
+      .first();
+    await expect(sopSelect).toBeVisible();
+
+    if (options.sop) {
+      await sopSelect.selectOption({ label: options.sop });
+    } else {
+      const sopRequired = await this.page
+        .locator('strong', { hasText: /^Select SOP$/i })
+        .locator('xpath=..')
+        .getByText('*')
+        .isVisible()
+        .catch(() => false);
+      if (sopRequired) {
+        const sopLabels = (await sopSelect.locator('option').allTextContents()).map((label) => label.trim());
+        const sopLabel = sopLabels.find((label) => label && !/No SOP selected/i.test(label));
+        expect(sopLabel, 'expected at least one SOP option when SOP is required').toBeTruthy();
+        await sopSelect.selectOption({ label: sopLabel! });
+      }
+    }
+
+    if (options.description) {
+      await this.page.getByPlaceholder(/Optional description/i).fill(options.description);
+    }
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/virtual-assistant\/assistants\//.test(response.url()) &&
+        response.request().method() === 'PUT' &&
+        response.status() === 200,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Activity/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    await expect(this.page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible({
+      timeout: 15000
+    });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectActivityInList(name: string) {
+    await expect(this.page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteActivity(name: string) {
+    await expect(this.page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Remove"], button:has(.fa-trash)').first()
+    });
+  }
 }
 
 export class AskPrudensPage {
