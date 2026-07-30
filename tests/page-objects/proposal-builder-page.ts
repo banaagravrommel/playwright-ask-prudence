@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { expectPageBaseline } from '../helpers/page-baseline';
+import { deleteRowByName } from '../helpers/smoke-cleanup';
 
 export class ProposalBuilderPage {
   readonly page: Page;
@@ -79,8 +80,17 @@ export class ProposalBuilderPage {
   }
 
   async createSession() {
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/quoting\/ai-sessions\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
     await expect(this.createSessionButton).toBeEnabled();
     await this.createSessionButton.click();
+    await saveResponse;
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
   }
 
@@ -89,6 +99,20 @@ export class ProposalBuilderPage {
     await this.pickAccount(accountName);
     await this.configureSession({ title, documents });
     await this.createSession();
+  }
+
+  async expectSessionInList(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await expect(this.page.getByRole('row').filter({ hasText: title }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteSession(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await deleteRowByName(this.page, title, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async generateProposal() {
