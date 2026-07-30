@@ -126,6 +126,13 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await livePage.expectLiveDataPage();
   });
 
+  test('live data monitoring panels shell loads', async ({ page }) => {
+    const livePage = new VirtualAssistantLivePage(page);
+    await livePage.goto();
+    await livePage.expectLiveDataPage();
+    await livePage.expectMonitoringPanelsShell();
+  });
+
   test('realtime page loads with call monitors', async ({ page }) => {
     const realtimePage = new VirtualAssistantRealtimePage(page);
     await realtimePage.goto();
