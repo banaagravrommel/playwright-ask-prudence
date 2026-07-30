@@ -214,6 +214,93 @@ export class VirtualAssistantPage {
     await expect(this.page.getByRole('button', { name: /Save Assistant/i })).toBeVisible();
   }
 
+  async openPersonalityTab() {
+    await this.page.getByRole('tab', { name: 'Personality' }).click();
+    await expect(this.page.getByText(/Personality Type/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByText(/Personality Description/i).first()).toBeVisible();
+  }
+
+  async openGreetingsTab() {
+    await this.page.getByRole('tab', { name: 'Greetings' }).click();
+    await expect(this.page.getByText(/Default Greeting/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByPlaceholder(/Used when no channel-specific greeting is set/i)).toBeVisible();
+  }
+
+  async fillPersonality(options: { type: string; description?: string }) {
+    await this.openPersonalityTab();
+    const typeSelect = this.page.locator('select').filter({ has: this.page.locator('option', { hasText: 'Professional' }) }).first();
+    await typeSelect.selectOption({ label: options.type });
+    await expect(typeSelect).toHaveValue(options.type);
+
+    if (options.description !== undefined) {
+      const description = this.page
+        .locator('label', { hasText: /Personality Description/i })
+        .locator('xpath=following::textarea[1]');
+      await description.fill(options.description);
+      await expect(description).toHaveValue(options.description);
+    }
+  }
+
+  async fillGreetings(options: { defaultGreeting?: string; chatGreeting?: string }) {
+    await this.openGreetingsTab();
+
+    if (options.defaultGreeting !== undefined) {
+      const defaultGreeting = this.page.getByPlaceholder(/Used when no channel-specific greeting is set/i);
+      await defaultGreeting.fill(options.defaultGreeting);
+      await expect(defaultGreeting).toHaveValue(options.defaultGreeting);
+    }
+
+    if (options.chatGreeting !== undefined) {
+      const chatGreeting = this.page.getByPlaceholder(/Greeting script for web\/chat conversations/i);
+      await chatGreeting.fill(options.chatGreeting);
+      await expect(chatGreeting).toHaveValue(options.chatGreeting);
+    }
+  }
+
+  async saveAssistant() {
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/virtual-assistant\/assistants\//.test(response.url()) &&
+        response.request().method() === 'PUT' &&
+        response.status() === 200,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Assistant/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+  }
+
+  async expectPersonality(options: { type: string; description?: string }) {
+    await this.openPersonalityTab();
+    const typeSelect = this.page.locator('select').filter({ has: this.page.locator('option', { hasText: 'Professional' }) }).first();
+    await expect(typeSelect).toHaveValue(options.type);
+
+    if (options.description !== undefined) {
+      const description = this.page
+        .locator('label', { hasText: /Personality Description/i })
+        .locator('xpath=following::textarea[1]');
+      await expect(description).toHaveValue(options.description);
+    }
+  }
+
+  async expectGreetings(options: { defaultGreeting?: string; chatGreeting?: string }) {
+    await this.openGreetingsTab();
+
+    if (options.defaultGreeting !== undefined) {
+      await expect(this.page.getByPlaceholder(/Used when no channel-specific greeting is set/i)).toHaveValue(
+        options.defaultGreeting
+      );
+    }
+
+    if (options.chatGreeting !== undefined) {
+      await expect(this.page.getByPlaceholder(/Greeting script for web\/chat conversations/i)).toHaveValue(
+        options.chatGreeting
+      );
+    }
+  }
+
   async openActivitiesTab() {
     await this.page.getByRole('tab', { name: 'Activities' }).click();
     await expect(this.page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible({

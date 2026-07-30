@@ -110,6 +110,30 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await expect(page.getByRole('tab', { name: 'Activities' })).toBeVisible();
   });
 
+  test('assistant personality and greetings save and persist', async ({ page }) => {
+    const vaPage = new VirtualAssistantPage(page);
+    const assistantName = smokeLabel('personality-assistant');
+    const personalityDescription = 'Smoke personality description for Playwright.';
+    const defaultGreeting = 'Hello — default smoke greeting.';
+    const chatGreeting = 'Hi there — chat smoke greeting.';
+    let assistantId: string | number | undefined;
+
+    try {
+      await vaPage.goto();
+      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+      await vaPage.fillPersonality({ type: 'Friendly', description: personalityDescription });
+      await vaPage.fillGreetings({ defaultGreeting, chatGreeting });
+      await vaPage.saveAssistant();
+
+      await vaPage.goto();
+      await vaPage.openAssistantEditor(assistantName);
+      await vaPage.expectPersonality({ type: 'Friendly', description: personalityDescription });
+      await vaPage.expectGreetings({ defaultGreeting, chatGreeting });
+    } finally {
+      await vaPage.deleteAssistant({ name: assistantName, assistantId });
+    }
+  });
+
   test('assistant activities creates a draft activity and cleans up', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     const assistantName = smokeLabel('activity-assistant');
