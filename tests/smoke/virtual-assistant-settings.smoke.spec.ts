@@ -94,6 +94,19 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     }
   });
 
+  test('settings creates a verification and cleans up', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const verificationName = smokeLabel('verification');
+
+    try {
+      await settingsPage.goto('verifications');
+      await settingsPage.createVerification({ name: verificationName });
+      await settingsPage.expectVerificationInList(verificationName);
+    } finally {
+      await settingsPage.deleteVerification(verificationName);
+    }
+  });
+
   test('settings simulate situations tab shows agents table', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto('simulate');

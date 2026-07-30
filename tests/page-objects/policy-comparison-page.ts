@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { expectPageBaseline } from '../helpers/page-baseline';
+import { deleteRowByName } from '../helpers/smoke-cleanup';
 
 export class PolicyComparisonPage {
   readonly page: Page;
@@ -69,9 +70,41 @@ export class PolicyComparisonPage {
   }
 
   async createSession() {
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/quoting\/ai-sessions\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
     await expect(this.createSessionButton).toBeEnabled();
     await this.createSessionButton.click();
+    await saveResponse;
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
+  }
+
+  async searchByComparisonName(name: string) {
+    const search = this.page.getByPlaceholder(/Search by comparison name/i);
+    await expect(search).toBeVisible({ timeout: 15000 });
+    await search.fill(name);
+    await this.page.waitForTimeout(1500);
+  }
+
+  async expectSessionInList(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await this.searchByComparisonName(title);
+    await expect(this.page.getByRole('row').filter({ hasText: title }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteSession(title: string) {
+    await this.goto();
+    await this.expectListPage();
+    await this.searchByComparisonName(title);
+    await deleteRowByName(this.page, title, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async attachSources(filePaths: string[]) {

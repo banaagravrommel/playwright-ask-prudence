@@ -818,6 +818,86 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('button', { name: /Save Verification/i })).toBeVisible();
   }
 
+  async createVerification(options: {
+    name: string;
+    description?: string;
+    providerLabel?: string;
+    scope?: 'Email' | 'SMS/Text' | 'Phone';
+  }) {
+    await this.openAddVerificationEditor();
+
+    await this.page.getByPlaceholder(/Customer Identity Check/i).fill(options.name);
+    await expect(this.page.getByPlaceholder(/Customer Identity Check/i)).toHaveValue(options.name);
+
+    const description = options.description ?? 'Smoke test verification created by Playwright.';
+    await this.page.getByPlaceholder(/Describe what this verification is for/i).fill(description);
+
+    await expect(this.page.getByText(/Loading providers/i)).toBeHidden({ timeout: 30000 }).catch(() => undefined);
+
+    const providerSelect = this.page.getByRole('combobox').filter({
+      has: this.page.getByRole('option', { name: /Select a provider/i })
+    });
+    await expect(providerSelect).toBeVisible({ timeout: 15000 });
+    await expect
+      .poll(async () => providerSelect.getByRole('option').count(), { timeout: 30000 })
+      .toBeGreaterThan(1);
+
+    const providerLabels = (await providerSelect.getByRole('option').allTextContents()).map((label) => label.trim());
+    const providerLabel =
+      options.providerLabel ??
+      providerLabels.find((label) => /^HubSpotqa$/i.test(label)) ??
+      providerLabels.find((label) => label && !/Select a provider/i.test(label));
+    expect(providerLabel, 'expected at least one integration provider option').toBeTruthy();
+    await providerSelect.selectOption({ label: providerLabel! });
+
+    const scope = options.scope ?? 'Email';
+    const scopeCheckbox =
+      scope === 'Email'
+        ? this.page.locator('#scope-email')
+        : scope === 'SMS/Text'
+          ? this.page.locator('#scope-sms')
+          : this.page.locator('#scope-phone');
+    await scopeCheckbox.check({ force: true });
+    await expect(scopeCheckbox).toBeChecked();
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/verifications\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Verification/i });
+    await expect(saveButton).toBeEnabled({ timeout: 15000 });
+    await saveButton.click();
+    await saveResponse;
+
+    const okButton = this.page.getByRole('button', { name: /^OK$/i });
+    if (await okButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await okButton.click();
+    }
+
+    await expect(this.page.getByRole('heading', { name: 'Verifications' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectVerificationInList(name: string) {
+    await this.goto('verifications');
+    await this.expectVerificationsSection();
+    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async deleteVerification(name: string) {
+    await this.goto('verifications');
+    await this.expectVerificationsSection();
+    await deleteRowByName(this.page, name, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
   async expectEscalationsSection() {
     await expect(this.page).toHaveURL(/section=escalations/);
     await expect(this.page.getByRole('heading', { name: /Escalations/i }).first()).toBeVisible();
