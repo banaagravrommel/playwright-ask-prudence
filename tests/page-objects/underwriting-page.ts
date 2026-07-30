@@ -352,12 +352,17 @@ export class UnderwritingGuidePage {
   async goto() {
     await this.page.goto('/aegis/underwriting-automation/guides');
     await this.page.waitForURL(/\/aegis\/underwriting-automation\/guides/);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   async expectPageShell() {
     await expect(this.page).toHaveURL(/\/aegis\/underwriting-automation\/guides/);
-    await expect(this.page.getByRole('button', { name: /Create Guide/i })).toBeVisible();
+    await expect(this.page.getByText('Underwriting Guide').first()).toBeVisible({ timeout: 30000 });
+    await expect(this.page.getByText(/Loading underwriting guide/i)).toBeHidden({ timeout: 60000 });
+    await expect(this.page.getByPlaceholder(/Company underwriting guide/i)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('button', { name: /Save Guide/i })).toBeVisible();
+    await expect(this.page.getByText('Submission Workspace').first()).toBeVisible();
+    await expect(this.page.getByText('Knowledge Base').first()).toBeVisible();
   }
 }
 
