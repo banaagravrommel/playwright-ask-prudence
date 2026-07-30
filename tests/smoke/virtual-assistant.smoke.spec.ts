@@ -84,6 +84,16 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     }
   });
 
+  test('sop flow canvas shell loads', async ({ page }) => {
+    const vaPage = new VirtualAssistantPage(page);
+
+    await vaPage.goto();
+    await vaPage.goToSops();
+    await vaPage.openAddSopEditor();
+    await vaPage.openSopFlowTab();
+    await vaPage.expectSopFlowCanvasShell();
+  });
+
   test('new observer form creates an observer', async ({ page }) => {
     const observersPage = new VirtualAssistantObserversPage(page);
     const observerName = smokeLabel('observer');
