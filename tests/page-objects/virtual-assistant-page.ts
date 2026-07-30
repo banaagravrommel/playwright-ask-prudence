@@ -176,6 +176,27 @@ export class VirtualAssistantPage {
     await expect(this.page.getByPlaceholder(/Lead Qualification Process/i)).toBeVisible();
   }
 
+  async openSopFlowTab() {
+    const flowTab = this.page.getByRole('tab', { name: 'Flow' });
+    await expect(flowTab).toBeVisible();
+    await flowTab.click();
+    await expect(this.page.locator('.sop-flow-canvas-container')).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Shell-only: flow canvas + node palette. Does not build a multi-node workflow. */
+  async expectSopFlowCanvasShell() {
+    const canvas = this.page.locator('.sop-flow-canvas-container');
+    await expect(canvas).toBeVisible();
+
+    const palette = this.page.locator('.node-palette.sop-node-palette, .sop-node-palette');
+    await expect(palette).toBeVisible();
+    for (const node of ['Start', 'SOP', 'Transfer', 'End'] as const) {
+      await expect(palette.locator('.palette-node-label', { hasText: node })).toBeVisible();
+    }
+
+    await expect(this.page.getByRole('heading', { name: /Flow Connections/i })).toBeVisible();
+  }
+
   async createSop(options: { title: string; description: string; steps: string }) {
     await this.page.getByPlaceholder(/Lead Qualification Process/i).fill(options.title);
     await this.page.getByPlaceholder(/Brief description of this SOP/i).fill(options.description);
