@@ -110,6 +110,44 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await expect(page.getByRole('tab', { name: 'Activities' })).toBeVisible();
   });
 
+  test('assistant activities creates a draft activity and cleans up', async ({ page }) => {
+    const vaPage = new VirtualAssistantPage(page);
+    const assistantName = smokeLabel('activity-assistant');
+    const activityName = smokeLabel('activity');
+    let assistantId: string | number | undefined;
+
+    try {
+      await vaPage.goto();
+      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+      await vaPage.openActivitiesTab();
+      await vaPage.createActivity({
+        name: activityName,
+        channel: 'Send Text/SMS',
+        description: 'Smoke test activity created by Playwright.'
+      });
+      await vaPage.expectActivityInList(activityName);
+    } finally {
+      try {
+        const activityRow = page.getByRole('row').filter({ hasText: activityName }).first();
+        const onActivities = await page
+          .getByRole('heading', { name: 'Activities', exact: true })
+          .isVisible()
+          .catch(() => false);
+        if (!onActivities || !(await activityRow.isVisible().catch(() => false))) {
+          await vaPage.goto();
+          await vaPage.openAssistantEditor(assistantName);
+          await vaPage.openActivitiesTab();
+        }
+        if (await activityRow.isVisible().catch(() => false)) {
+          await vaPage.deleteActivity(activityName);
+        }
+      } catch {
+        // Best-effort activity cleanup before assistant teardown.
+      }
+      await vaPage.deleteAssistant({ name: assistantName, assistantId });
+    }
+  });
+
   test('ask prudens workbench loads', async ({ page }) => {
     const askPage = new AskPrudensPage(page);
     await askPage.goto();
