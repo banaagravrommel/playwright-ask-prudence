@@ -1080,21 +1080,110 @@ export class VirtualAssistantSettingsPage {
 
 export class VirtualAssistantLivePage {
   readonly page: Page;
+  readonly liveNav: Locator;
 
   constructor(page: Page) {
     this.page = page;
+    this.liveNav = page.locator('#virtual-assistant-live-nav');
   }
 
   async goto() {
     await this.page.goto('/virtual-assistant-live');
     await this.page.waitForURL(/\/virtual-assistant-live/);
     await this.page.waitForLoadState('networkidle');
+    await this.dismissAppSidebarOverlap();
+  }
+
+  async dismissAppSidebarOverlap() {
+    await this.page.evaluate(() => {
+      const sidebar = document.querySelector('.app-sidebar');
+      if (sidebar instanceof HTMLElement) {
+        sidebar.style.display = 'none';
+      }
+    });
   }
 
   async expectLiveDataPage() {
     await expect(this.page).toHaveURL(/\/virtual-assistant-live/);
     await expect(this.page.getByRole('heading', { name: /Live Data/i }).first()).toBeVisible();
     await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
+  }
+
+  async expectMonitoringNav() {
+    await expect(this.liveNav).toBeVisible();
+    for (const itemClass of [
+      'nav-item-activities',
+      'nav-item-inbox',
+      'nav-item-sms',
+      'nav-item-calls',
+      'nav-item-qa',
+      'nav-item-escalations-live'
+    ] as const) {
+      await expect(this.liveNav.locator(`a.${itemClass}`)).toBeVisible();
+    }
+  }
+
+  async goToPanel(panel: 'Activities' | 'Inbox' | 'SMS' | 'Calls' | 'QA' | 'Escalations') {
+    const itemClassByPanel = {
+      Activities: 'nav-item-activities',
+      Inbox: 'nav-item-inbox',
+      SMS: 'nav-item-sms',
+      Calls: 'nav-item-calls',
+      QA: 'nav-item-qa',
+      Escalations: 'nav-item-escalations-live'
+    } as const;
+
+    const link = this.liveNav.locator(`a.${itemClassByPanel[panel]}`);
+    await expect(link).toBeVisible();
+    await link.click();
+    await expect(link).toHaveClass(/active/);
+  }
+
+  async expectActivitiesFeedPanel() {
+    await this.goToPanel('Activities');
+    await expect(this.page.getByRole('heading', { name: /Real-time Activity Feed/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Search activities/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i })).toBeVisible();
+  }
+
+  async expectInboxPanel() {
+    await this.goToPanel('Inbox');
+    await expect(this.page.getByRole('heading', { name: /Inbox/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Search subject, sender, snippet/i)).toBeVisible();
+  }
+
+  async expectSmsPanel() {
+    await this.goToPanel('SMS');
+    await expect(this.page.getByRole('heading', { name: /SMS/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Search from, to, message, response/i)).toBeVisible();
+  }
+
+  async expectCallsPanel() {
+    await this.goToPanel('Calls');
+    await expect(this.page.getByRole('heading', { name: /Calls/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Search call sid, from, to, assistant/i)).toBeVisible();
+  }
+
+  async expectCommunicationQaPanel() {
+    await this.goToPanel('QA');
+    await expect(this.page.getByRole('heading', { name: /Communication QA/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /Review Queue/i })).toBeVisible();
+  }
+
+  async expectEscalationTasksPanel() {
+    await this.goToPanel('Escalations');
+    await expect(this.page.getByRole('heading', { name: /Escalation Tasks/i })).toBeVisible();
+  }
+
+  /** Shell-only: nav + each required monitoring panel heading/controls. No live message content. */
+  async expectMonitoringPanelsShell() {
+    await this.expectMonitoringNav();
+    await this.expectActivitiesFeedPanel();
+    await this.expectInboxPanel();
+    await this.expectSmsPanel();
+    await this.expectCallsPanel();
+    await this.expectCommunicationQaPanel();
+    await this.expectEscalationTasksPanel();
   }
 }
 
