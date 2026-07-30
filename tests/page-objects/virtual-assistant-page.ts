@@ -712,7 +712,52 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('tab', { name: 'Form Details' })).toBeVisible();
     await expect(this.page.getByRole('tab', { name: 'Schema' })).toBeVisible();
     await expect(this.page.getByRole('tab', { name: 'Field Selection' })).toBeVisible();
+    await expect(this.page.getByRole('tab', { name: 'Embed' })).toBeVisible();
     await expect(this.page.getByPlaceholder(/Enter form name/i)).toBeVisible();
+  }
+
+  async openFormEditorTab(tab: 'Form Details' | 'Schema' | 'Field Selection' | 'Embed') {
+    await this.page.getByRole('tab', { name: tab }).click();
+  }
+
+  async expectFormEditorTabsShell() {
+    await this.openFormEditorTab('Form Details');
+    await expect(this.page.getByPlaceholder(/Enter form name/i)).toBeVisible();
+    await expect(this.page.getByText(/Description/i).first()).toBeVisible();
+
+    await this.openFormEditorTab('Schema');
+    await this.expectFormSchemaManagementShell();
+
+    await this.openFormEditorTab('Field Selection');
+    await expect(
+      this.page
+        .getByText(/No Schema Linked/i)
+        .or(this.page.getByText(/Link a schema first/i))
+        .or(this.page.getByRole('button', { name: /Link Schema/i }))
+        .or(this.page.getByText(/Select fields/i))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+
+    await this.openFormEditorTab('Embed');
+    await expect(
+      this.page
+        .getByText(/Save the form first to generate a public URL/i)
+        .or(this.page.getByText(/FORM SETTINGS/i))
+        .or(this.page.getByText(/Submit Button Text/i))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectFormSchemaManagementShell() {
+    await expect(this.page.getByText(/Schema Management/i).first()).toBeVisible({ timeout: 15000 });
+    await expect(
+      this.page
+        .getByText(/No schema defined yet/i)
+        .or(this.page.getByRole('button', { name: /Add Schema/i }))
+        .or(this.page.getByRole('button', { name: /Edit Schema/i }))
+        .or(this.page.getByText(/linked schema/i))
+        .first()
+    ).toBeVisible();
   }
 
   async createForm(options: { name: string; description?: string }) {

@@ -30,6 +30,13 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     }
   });
 
+  test('settings form schema shell loads', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    await settingsPage.goto('forms');
+    await settingsPage.openNewFormEditor();
+    await settingsPage.expectFormEditorTabsShell();
+  });
+
   test('settings escalation groups section loads and opens add group editor', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto('escalations');
