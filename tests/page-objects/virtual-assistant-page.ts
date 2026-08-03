@@ -911,11 +911,124 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
   }
 
+  async openKnowledgeBaseEditor(name: string) {
+    const row = this.page.getByRole('row').filter({ hasText: name }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    const editButton = row.locator('button[title="Edit"], button[title*="Edit" i], button:has(.fa-edit), button:has(.fa-pen)').first();
+    if (await editButton.isVisible().catch(() => false)) {
+      await editButton.click();
+    } else {
+      await row.getByText(name, { exact: true }).click();
+    }
+    await expect(this.page.getByRole('button', { name: /Save Knowledge Base/i })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('button', { name: /Add Documents/i })).toBeVisible();
+  }
+
+  async openKnowledgeBaseAddDocuments() {
+    await this.page.getByRole('button', { name: /Add Documents/i }).click();
+    await expect(this.page.getByRole('heading', { name: /Add New Resource/i })).toBeVisible({ timeout: 15000 });
+    await this.page.getByText(/Upload PDF, Word, Markdown, or text documents/i).click();
+    await expect(this.page.getByRole('heading', { name: /^Document$/i })).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectKnowledgeBaseDocumentUploadSurface() {
+    await expect(this.page.getByRole('heading', { name: /^Document$/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Enter account name/i)).toBeVisible();
+    await expect(this.page.locator('input[type="file"]').first()).toBeAttached();
+    await expect(
+      this.page
+        .getByRole('button', { name: /Browse Files/i })
+        .or(this.page.getByText(/Drag and drop your file here/i))
+        .first()
+    ).toBeVisible();
+  }
+
+  async prepareKnowledgeBaseDocumentUpload(options: { filePath: string; accountName: string; fileName: string }) {
+    await this.page.locator('input[type="file"]').first().setInputFiles(options.filePath);
+    await expect(this.page.getByText(options.fileName, { exact: true })).toBeVisible({ timeout: 15000 });
+    await this.page.getByPlaceholder(/Enter account name/i).fill(options.accountName);
+    await expect(this.page.getByRole('button', { name: /Upload Document/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Upload Document/i })).toBeEnabled();
+  }
+
+  /**
+   * Attempts document upload. Returns true when a document appears on the KB editor list.
+   * Returns false when upload is blocked/fails after the upload surface was exercised.
+   */
+  async uploadKnowledgeBaseDocument(options: { fileName: string; documentLabel?: string | RegExp }): Promise<boolean> {
+    const documentLabel = options.documentLabel ?? /Smoke Test Document A|smoke-doc-a\.pdf/i;
+    await this.page.getByRole('button', { name: /Upload Document/i }).click();
+
+    const processing = this.page.getByText(/Processing Document/i).first();
+    const attachedDoc = this.page.getByText(documentLabel).first();
+    await expect(processing.or(attachedDoc).first()).toBeVisible({ timeout: 30000 });
+
+    if (await processing.isVisible().catch(() => false)) {
+      const failed = this.page.locator('.document-section, [class*="processing"], [class*="modal"]').getByText(/Failed/i).first();
+      const done = this.page.getByRole('button', { name: /^Done$/i });
+      await expect(failed.or(done).or(attachedDoc).first()).toBeVisible({ timeout: 60000 });
+
+      const uploadFailed = await failed.isVisible().catch(() => false);
+      if (await done.isVisible().catch(() => false)) {
+        await done.click();
+        await expect(done).toBeHidden({ timeout: 15000 });
+      }
+      if (uploadFailed) {
+        return false;
+      }
+    }
+
+    const noDocumentsYet = this.page.getByText(/No documents added yet/i);
+    await expect(attachedDoc.or(noDocumentsYet).first()).toBeVisible({ timeout: 15000 });
+    if (await attachedDoc.isVisible().catch(() => false)) {
+      return true;
+    }
+    return false;
+  }
+
+  async cancelKnowledgeBaseDocumentUpload() {
+    const documentHeading = this.page.getByRole('heading', { name: /^Document$/i });
+    if (await documentHeading.isVisible().catch(() => false)) {
+      const documentPanel = this.page.locator('.document-section').filter({ has: documentHeading });
+      await documentPanel.getByRole('button', { name: /^Cancel$/i }).click();
+    }
+
+    const resourceHeading = this.page.getByRole('heading', { name: /Add New Resource/i });
+    if (await resourceHeading.isVisible().catch(() => false)) {
+      await this.page.keyboard.press('Escape');
+      if (await resourceHeading.isVisible().catch(() => false)) {
+        await this.page.locator('.modal.show button.btn-close, .modal.show .close, [class*="resource"] button.close').first().click().catch(() => undefined);
+      }
+    }
+
+    await expect(this.page.getByRole('button', { name: /Save Knowledge Base/i })).toBeVisible({ timeout: 15000 });
+  }
+
+  async cancelKnowledgeBaseEditor() {
+    const saveVisible = await this.page.getByRole('button', { name: /Save Knowledge Base/i }).isVisible().catch(() => false);
+    if (saveVisible) {
+      await this.page.getByRole('button', { name: /^Cancel$/i }).last().click();
+      await expect(this.page.getByRole('heading', { name: 'Knowledge Bases' })).toBeVisible({ timeout: 15000 });
+    }
+  }
+
   async deleteKnowledgeBase(name: string) {
     await this.goto();
     await this.expectKnowledgeBasesSection();
     await deleteRowByName(this.page, name, {
       deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
+  }
+
+  async deleteKnowledgeBaseIfPresent(name: string) {
+    await this.goto();
+    await this.expectKnowledgeBasesSection();
+    const row = this.page.getByRole('row').filter({ hasText: name });
+    if ((await row.count()) === 0) {
+      return;
+    }
+    await deleteRowByName(this.page, name, {
+      deleteButton: (r) => r.locator('button[title="Delete"]').first()
     });
   }
 
