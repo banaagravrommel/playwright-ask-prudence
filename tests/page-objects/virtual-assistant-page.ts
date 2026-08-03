@@ -938,6 +938,34 @@ export class VirtualAssistantSettingsPage {
     await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
   }
 
+  async createApiTool(options: {
+    name: string;
+    description: string;
+    endpoint: string;
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+    headersJson?: string;
+  }) {
+    await this.page.getByPlaceholder(/Enter tool name/i).fill(options.name);
+    await this.page.locator('select').first().selectOption({ label: 'API' });
+    await this.page.getByPlaceholder(/Describe what this tool does/i).fill(options.description);
+
+    await expect(this.page.getByText(/API CONFIGURATION/i)).toBeVisible();
+    await this.page.locator('select').nth(1).selectOption(options.method ?? 'GET');
+    await this.page.getByPlaceholder(/https:\/\/api\.example\.com\/endpoint/i).fill(options.endpoint);
+
+    if (options.headersJson) {
+      await this.page
+        .getByPlaceholder(/Authorization.*Bearer|Content-Type.*application\/json/i)
+        .fill(options.headersJson);
+    }
+
+    const saveButton = this.page.getByRole('button', { name: /Save Tool/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(this.page.getByRole('heading', { name: 'Agent Tools' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.getByRole('row').filter({ hasText: options.name }).first()).toBeVisible({ timeout: 15000 });
+  }
+
   async deleteTool(name: string) {
     await this.goto('tools');
     await this.expectToolsSection();

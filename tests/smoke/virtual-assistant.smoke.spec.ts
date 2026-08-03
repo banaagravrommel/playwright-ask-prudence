@@ -303,6 +303,24 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     }
   });
 
+  test('settings add tool saves an API tool', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const toolName = smokeLabel('api-tool');
+
+    try {
+      await settingsPage.goto('tools');
+      await settingsPage.openAddToolEditor();
+      await settingsPage.createApiTool({
+        name: toolName,
+        description: 'Smoke test API tool created by Playwright.',
+        method: 'GET',
+        endpoint: 'https://httpbin.org/get'
+      });
+    } finally {
+      await settingsPage.deleteTool(toolName);
+    }
+  });
+
   test('settings trigger admin section loads and opens new trigger editor', async ({ page }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     await settingsPage.goto();
