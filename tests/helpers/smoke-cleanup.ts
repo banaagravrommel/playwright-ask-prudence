@@ -1,6 +1,14 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
+ * Shared UI helpers for smoke data teardown (confirm dialogs, delete table rows).
+ *
+ * Specs that create data should register page-object `delete*` calls via
+ * `trackCleanup` from `tests/helpers/smoke-test.ts` (runs after each test, LIFO).
+ * Prefer that over ad-hoc try/finally unless the page lifecycle requires it.
+ */
+
+/**
  * Click an action that may open a native confirm(), SweetAlert2, or in-page dialog.
  */
 export async function confirmDestructiveAction(page: Page, action: () => Promise<void>) {

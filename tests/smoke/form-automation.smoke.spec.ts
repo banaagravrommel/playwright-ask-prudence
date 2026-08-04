@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from '../helpers/smoke-test';
 import { FormFillPage, FormFillTemplatesPage } from '../page-objects/form-automation-page';
 import { smokeLabel } from '../helpers/smoke-data';
 
@@ -36,15 +36,14 @@ test.describe('Form Automation smoke @smoke', () => {
     await formFillPage.openNewFormFill();
   });
 
-  test('form fill creates a record via save and cleans up', async ({ page }) => {
+  test('form fill creates a record via save and cleans up', async ({ page, trackCleanup }) => {
     const formFillPage = new FormFillPage(page);
     const recordName = smokeLabel('form-fill-record');
-
-    try {
-      await formFillPage.goto();
-      await formFillPage.createFormFillRecord({ name: recordName });
-    } finally {
+    trackCleanup(async () => {
       await formFillPage.deleteFormFillRecord(recordName);
-    }
+    });
+
+    await formFillPage.goto();
+    await formFillPage.createFormFillRecord({ name: recordName });
   });
 });

@@ -1,0 +1,35 @@
+---
+description: Require cleanup for Playwright tests that create E2E data
+globs: tests/**/*.ts
+alwaysApply: false
+---
+
+# E2E Data Teardown
+
+- Any test that creates data (sessions, KB, tools, intakes, assistants, etc.) **must** clean it up.
+- Prefer `trackCleanup` from `tests/helpers/smoke-test.ts` (fixture runs after the test, LIFO, including on failure).
+- Keep delete/deactivate logic on page objects; `tests/helpers/smoke-cleanup.ts` is for shared UI delete helpers only.
+- Use `smokeLabel()` (or equivalent unique names) so cleanup targets only test-owned data.
+- Load/shell-only smokes do not need cleanup.
+- If the product has no delete/archive path, document the gap in the spec and use the supported teardown (e.g. deactivate) or skip create until cleanup exists.
+- New create-flow PRs must include cleanup in the same change set.
+
+## Pattern
+
+```ts
+import { test, expect } from '../helpers/smoke-test';
+import { smokeLabel } from '../helpers/smoke-data';
+
+test('creates X and cleans up', async ({ page, trackCleanup }) => {
+  const name = smokeLabel('x');
+  const po = new SomePage(page);
+  trackCleanup(async () => {
+    await po.deleteX(name);
+  });
+
+  await po.goto();
+  await po.createX({ name });
+});
+```
+
+Register cleanups in creation order when multiple entities exist (LIFO tears down dependents first).
