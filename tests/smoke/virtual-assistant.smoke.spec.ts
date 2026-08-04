@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '../helpers/smoke-test';
 import {
   AskPrudensPage,
   VirtualAssistantObserversPage,
@@ -33,18 +33,18 @@ test.describe('Virtual Assistant smoke @smoke', () => {
 
   // Gap: Assistants have View/Edit only — no Delete UI (API DELETE returns 405).
   // Cleanup deactivates the created assistant (status=inactive) after verify.
-  test('creates a draft assistant via save assistant', async ({ page }) => {
+  test('creates a draft assistant via save assistant', async ({ page, trackCleanup }) => {
     const vaPage = new VirtualAssistantPage(page);
     const assistantName = smokeLabel('assistant');
     let assistantId: string | number | undefined;
 
-    try {
-      await vaPage.goto();
-      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
-      await vaPage.expectAssistantInList(assistantName);
-    } finally {
+    trackCleanup(async () => {
       await vaPage.deleteAssistant({ name: assistantName, assistantId });
-    }
+    });
+
+    await vaPage.goto();
+    ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+    await vaPage.expectAssistantInList(assistantName);
   });
 
   test('observers page loads from module sub-navigation', async ({ page }) => {
@@ -66,22 +66,21 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await vaPage.expectListPage();
   });
 
-  test('add sop opens editor and saves a draft sop', async ({ page }) => {
+  test('add sop opens editor and saves a draft sop', async ({ page, trackCleanup }) => {
     const vaPage = new VirtualAssistantPage(page);
     const sopTitle = smokeLabel('sop');
-
-    try {
-      await vaPage.goto();
-      await vaPage.goToSops();
-      await vaPage.openAddSopEditor();
-      await vaPage.createSop({
-        title: sopTitle,
-        description: 'Smoke test SOP created by Playwright',
-        steps: 'Step 1: Verify the SOP editor saves successfully.'
-      });
-    } finally {
+    trackCleanup(async () => {
       await vaPage.deleteSop(sopTitle);
-    }
+    });
+
+    await vaPage.goto();
+    await vaPage.goToSops();
+    await vaPage.openAddSopEditor();
+    await vaPage.createSop({
+      title: sopTitle,
+      description: 'Smoke test SOP created by Playwright',
+      steps: 'Step 1: Verify the SOP editor saves successfully.'
+    });
   });
 
   test('sop flow canvas shell loads', async ({ page }) => {
@@ -94,20 +93,19 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await vaPage.expectSopFlowCanvasShell();
   });
 
-  test('new observer form creates an observer', async ({ page }) => {
+  test('new observer form creates an observer', async ({ page, trackCleanup }) => {
     const observersPage = new VirtualAssistantObserversPage(page);
     const observerName = smokeLabel('observer');
-
-    try {
-      await observersPage.goto();
-      await observersPage.openNewObserverForm();
-      await observersPage.createObserver({
-        name: observerName,
-        description: 'Smoke test observer created by Playwright.'
-      });
-    } finally {
+    trackCleanup(async () => {
       await observersPage.deleteObserver(observerName);
-    }
+    });
+
+    await observersPage.goto();
+    await observersPage.openNewObserverForm();
+    await observersPage.createObserver({
+      name: observerName,
+      description: 'Smoke test observer created by Playwright.'
+    });
   });
 
   test('existing assistant opens in the editor from the list', async ({ page }) => {
@@ -120,7 +118,7 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await expect(page.getByRole('tab', { name: 'Activities' })).toBeVisible();
   });
 
-  test('assistant personality and greetings save and persist', async ({ page }) => {
+  test('assistant personality and greetings save and persist', async ({ page, trackCleanup }) => {
     const vaPage = new VirtualAssistantPage(page);
     const assistantName = smokeLabel('personality-assistant');
     const personalityDescription = 'Smoke personality description for Playwright.';
@@ -128,39 +126,33 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     const chatGreeting = 'Hi there — chat smoke greeting.';
     let assistantId: string | number | undefined;
 
-    try {
-      await vaPage.goto();
-      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
-      await vaPage.fillPersonality({ type: 'Friendly', description: personalityDescription });
-      await vaPage.fillGreetings({ defaultGreeting, chatGreeting });
-      await vaPage.saveAssistant();
-
-      await vaPage.goto();
-      await vaPage.openAssistantEditor(assistantName);
-      await vaPage.expectPersonality({ type: 'Friendly', description: personalityDescription });
-      await vaPage.expectGreetings({ defaultGreeting, chatGreeting });
-    } finally {
+    trackCleanup(async () => {
       await vaPage.deleteAssistant({ name: assistantName, assistantId });
-    }
+    });
+
+    await vaPage.goto();
+    ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+    await vaPage.fillPersonality({ type: 'Friendly', description: personalityDescription });
+    await vaPage.fillGreetings({ defaultGreeting, chatGreeting });
+    await vaPage.saveAssistant();
+
+    await vaPage.goto();
+    await vaPage.openAssistantEditor(assistantName);
+    await vaPage.expectPersonality({ type: 'Friendly', description: personalityDescription });
+    await vaPage.expectGreetings({ defaultGreeting, chatGreeting });
   });
 
-  test('assistant activities creates a draft activity and cleans up', async ({ page }) => {
+  test('assistant activities creates a draft activity and cleans up', async ({ page, trackCleanup }) => {
     const vaPage = new VirtualAssistantPage(page);
     const assistantName = smokeLabel('activity-assistant');
     const activityName = smokeLabel('activity');
     let assistantId: string | number | undefined;
 
-    try {
-      await vaPage.goto();
-      ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
-      await vaPage.openActivitiesTab();
-      await vaPage.createActivity({
-        name: activityName,
-        channel: 'Send Text/SMS',
-        description: 'Smoke test activity created by Playwright.'
-      });
-      await vaPage.expectActivityInList(activityName);
-    } finally {
+    // Register assistant first so LIFO tears down activity, then assistant.
+    trackCleanup(async () => {
+      await vaPage.deleteAssistant({ name: assistantName, assistantId });
+    });
+    trackCleanup(async () => {
       try {
         const activityRow = page.getByRole('row').filter({ hasText: activityName }).first();
         const onActivities = await page
@@ -178,8 +170,17 @@ test.describe('Virtual Assistant smoke @smoke', () => {
       } catch {
         // Best-effort activity cleanup before assistant teardown.
       }
-      await vaPage.deleteAssistant({ name: assistantName, assistantId });
-    }
+    });
+
+    await vaPage.goto();
+    ({ assistantId } = await vaPage.createAssistant({ name: assistantName }));
+    await vaPage.openActivitiesTab();
+    await vaPage.createActivity({
+      name: activityName,
+      channel: 'Send Text/SMS',
+      description: 'Smoke test activity created by Playwright.'
+    });
+    await vaPage.expectActivityInList(activityName);
   });
 
   test('ask prudens workbench loads', async ({ page }) => {
@@ -190,36 +191,42 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectWorkbench();
   });
 
-  test('ask prudens creates a demo chat session', async ({ page }) => {
+  test('ask prudens creates a demo chat session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-flow');
-
-    try {
-      await askPage.goto();
-      const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo', 'smoke');
-      await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
-      await askPage.expectAskPrudensSessionTabs(resourceName);
-      await askPage.expectAskPrudensAgentDialog('Demo');
-      await askPage.expectAskPrudensSopDialog();
-    } finally {
+    trackCleanup(async () => {
       await askPage.deleteSession(sessionTitle);
-    }
+    });
+
+    await askPage.goto();
+    const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo', 'smoke');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+    await askPage.expectAskPrudensSessionTabs(resourceName);
+    await askPage.expectAskPrudensAgentDialog('Demo');
+    await askPage.expectAskPrudensSopDialog();
   });
 
-  test('ask prudens creates a certificate review session', async ({ page }) => {
+  test('ask prudens creates a certificate review session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-cert-review');
-
-    try {
-      await askPage.goto();
-      const resourceName = await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Certificate Review', 'smoke');
-      await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Certificate Review' });
-      await askPage.expectAskPrudensSessionTabs(resourceName);
-      await askPage.expectAskPrudensAgentDialog('Certificate Review');
-      await askPage.expectAskPrudensSopDialog();
-    } finally {
+    trackCleanup(async () => {
       await askPage.deleteSession(sessionTitle);
-    }
+    });
+
+    await askPage.goto();
+    const resourceName = await askPage.startAskPrudensChatSession(
+      'Demo',
+      sessionTitle,
+      'Certificate Review',
+      'smoke'
+    );
+    await askPage.expectAskPrudensChatReady(sessionTitle, {
+      accountName: 'Demo',
+      agent: 'Certificate Review'
+    });
+    await askPage.expectAskPrudensSessionTabs(resourceName);
+    await askPage.expectAskPrudensAgentDialog('Certificate Review');
+    await askPage.expectAskPrudensSopDialog();
   });
 
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
@@ -271,54 +278,51 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await settingsPage.expectKnowledgeBasesSection();
   });
 
-  test('settings add knowledge base saves a draft', async ({ page }) => {
+  test('settings add knowledge base saves a draft', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const kbName = smokeLabel('kb');
-
-    try {
-      await settingsPage.goto();
-      await settingsPage.openAddKnowledgeBaseEditor();
-      await settingsPage.createKnowledgeBase({
-        name: kbName,
-        purpose: 'Smoke test knowledge base created by Playwright.'
-      });
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteKnowledgeBase(kbName);
-    }
+    });
+
+    await settingsPage.goto();
+    await settingsPage.openAddKnowledgeBaseEditor();
+    await settingsPage.createKnowledgeBase({
+      name: kbName,
+      purpose: 'Smoke test knowledge base created by Playwright.'
+    });
   });
 
-  test('settings add tool saves an internal function tool', async ({ page }) => {
+  test('settings add tool saves an internal function tool', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const toolName = smokeLabel('tool');
-
-    try {
-      await settingsPage.goto('tools');
-      await settingsPage.openAddToolEditor();
-      await settingsPage.createTool({
-        name: toolName,
-        description: 'Smoke test tool created by Playwright.'
-      });
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteTool(toolName);
-    }
+    });
+
+    await settingsPage.goto('tools');
+    await settingsPage.openAddToolEditor();
+    await settingsPage.createTool({
+      name: toolName,
+      description: 'Smoke test tool created by Playwright.'
+    });
   });
 
-  test('settings add tool saves an API tool', async ({ page }) => {
+  test('settings add tool saves an API tool', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const toolName = smokeLabel('api-tool');
-
-    try {
-      await settingsPage.goto('tools');
-      await settingsPage.openAddToolEditor();
-      await settingsPage.createApiTool({
-        name: toolName,
-        description: 'Smoke test API tool created by Playwright.',
-        method: 'GET',
-        endpoint: 'https://httpbin.org/get'
-      });
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteTool(toolName);
-    }
+    });
+
+    await settingsPage.goto('tools');
+    await settingsPage.openAddToolEditor();
+    await settingsPage.createApiTool({
+      name: toolName,
+      description: 'Smoke test API tool created by Playwright.',
+      method: 'GET',
+      endpoint: 'https://httpbin.org/get'
+    });
   });
 
   test('settings trigger admin section loads and opens new trigger editor', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from '../helpers/smoke-test';
 import { smokeLabel } from '../helpers/smoke-data';
 import {
   IntakeMatchPage,
@@ -16,22 +16,21 @@ test.describe('Underwriting smoke @smoke', () => {
     await intakePage.expectListPage();
   });
 
-  test('intake match creates a draft via create session', async ({ page }) => {
+  test('intake match creates a draft via create session', async ({ page, trackCleanup }) => {
     const intakePage = new IntakeMatchPage(page);
     const intakeTitle = smokeLabel('intake');
-
-    try {
-      await intakePage.goto();
-      await intakePage.createIntakeDraft({
-        accountName: 'QA',
-        title: intakeTitle,
-        agent: 'Demo',
-        productLine: 'General Liability'
-      });
-      await intakePage.expectIntakeInList(intakeTitle);
-    } finally {
+    trackCleanup(async () => {
       await intakePage.deleteIntake(intakeTitle);
-    }
+    });
+
+    await intakePage.goto();
+    await intakePage.createIntakeDraft({
+      accountName: 'QA',
+      title: intakeTitle,
+      agent: 'Demo',
+      productLine: 'General Liability'
+    });
+    await intakePage.expectIntakeInList(intakeTitle);
   });
 
   test('submissions list page loads', async ({ page }) => {
@@ -40,17 +39,16 @@ test.describe('Underwriting smoke @smoke', () => {
     await submissionsPage.expectListPage();
   });
 
-  test('submissions creates a draft via save', async ({ page }) => {
+  test('submissions creates a draft via save', async ({ page, trackCleanup }) => {
     const submissionsPage = new UnderwritingSubmissionsPage(page);
     const purpose = smokeLabel('submission');
-
-    try {
-      await submissionsPage.goto();
-      await submissionsPage.createSubmissionDraft({ purpose });
-      await submissionsPage.expectSubmissionInList(purpose);
-    } finally {
+    trackCleanup(async () => {
       await submissionsPage.deleteSubmission(purpose);
-    }
+    });
+
+    await submissionsPage.goto();
+    await submissionsPage.createSubmissionDraft({ purpose });
+    await submissionsPage.expectSubmissionInList(purpose);
   });
 
   test('packages list page loads', async ({ page }) => {
@@ -59,19 +57,18 @@ test.describe('Underwriting smoke @smoke', () => {
     await packagesPage.expectListPage();
   });
 
-  test('packages creates a draft via save package', async ({ page }) => {
+  test('packages creates a draft via save package', async ({ page, trackCleanup }) => {
     const packagesPage = new UnderwritingPackagesPage(page);
     const packageName = smokeLabel('package');
-
-    try {
-      await packagesPage.goto();
-      await packagesPage.createPackage({
-        name: packageName,
-        purpose: 'Smoke create package'
-      });
-    } finally {
+    trackCleanup(async () => {
       await packagesPage.deletePackage(packageName);
-    }
+    });
+
+    await packagesPage.goto();
+    await packagesPage.createPackage({
+      name: packageName,
+      purpose: 'Smoke create package'
+    });
   });
 
   test('carriers list page loads', async ({ page }) => {

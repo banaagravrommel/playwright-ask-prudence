@@ -13,3 +13,4 @@ alwaysApply: false
 - Authenticated smokes use the existing Playwright projects (`smoke-app` + `storageState`); do not re-login inline unless testing auth.
 - New smokes must be included by existing `testMatch` in `playwright.config.ts`, or update that project’s match list.
 - Keep selectors resilient to empty states (page can show “No calls yet” and still be valid).
+- Data-creating smokes: import `test` from `tests/helpers/smoke-test.ts` and register teardown with `trackCleanup` (see `e2e-data-teardown` rule).

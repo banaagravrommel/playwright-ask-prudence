@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../helpers/smoke-test';
 import {
   VirtualAssistantLivePage,
   VirtualAssistantRealtimePage,
@@ -15,55 +15,54 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.navigateAllSettingsSections();
   });
 
-  test('settings knowledge base documents upload surface works', async ({ page }) => {
+  test('settings knowledge base documents upload surface works', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const kbName = smokeLabel('kb-docs');
     const accountName = smokeLabel('kb-acct');
     const fileName = 'smoke-doc-a.pdf';
 
-    try {
-      await settingsPage.goto();
-      await settingsPage.openAddKnowledgeBaseEditor();
-      await settingsPage.createKnowledgeBase({
-        name: kbName,
-        purpose: 'Smoke test knowledge base for documents upload.'
-      });
-
-      await settingsPage.openKnowledgeBaseEditor(kbName);
-      await settingsPage.openKnowledgeBaseAddDocuments();
-      await settingsPage.expectKnowledgeBaseDocumentUploadSurface();
-      await settingsPage.prepareKnowledgeBaseDocumentUpload({
-        filePath: SMOKE_DOCUMENTS[0],
-        accountName,
-        fileName
-      });
-
-      // Prefer a real upload; acceptance allows the prepared upload surface when blocked.
-      const attached = await settingsPage.uploadKnowledgeBaseDocument({ fileName });
-      if (attached) {
-        await expect(page.getByText(/Smoke Test Document A/i).first()).toBeVisible();
-      }
-      await settingsPage.cancelKnowledgeBaseDocumentUpload();
-      await settingsPage.cancelKnowledgeBaseEditor();
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteKnowledgeBaseIfPresent(kbName);
+    });
+
+    await settingsPage.goto();
+    await settingsPage.openAddKnowledgeBaseEditor();
+    await settingsPage.createKnowledgeBase({
+      name: kbName,
+      purpose: 'Smoke test knowledge base for documents upload.'
+    });
+
+    await settingsPage.openKnowledgeBaseEditor(kbName);
+    await settingsPage.openKnowledgeBaseAddDocuments();
+    await settingsPage.expectKnowledgeBaseDocumentUploadSurface();
+    await settingsPage.prepareKnowledgeBaseDocumentUpload({
+      filePath: SMOKE_DOCUMENTS[0],
+      accountName,
+      fileName
+    });
+
+    // Prefer a real upload; acceptance allows the prepared upload surface when blocked.
+    const attached = await settingsPage.uploadKnowledgeBaseDocument({ fileName });
+    if (attached) {
+      await expect(page.getByText(/Smoke Test Document A/i).first()).toBeVisible();
     }
+    await settingsPage.cancelKnowledgeBaseDocumentUpload();
+    await settingsPage.cancelKnowledgeBaseEditor();
   });
 
-  test('settings saves a draft form', async ({ page }) => {
+  test('settings saves a draft form', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const formName = smokeLabel('form');
-
-    try {
-      await settingsPage.goto('forms');
-      await settingsPage.openNewFormEditor();
-      await settingsPage.createForm({
-        name: formName,
-        description: 'Smoke test form created by Playwright.'
-      });
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteForm(formName);
-    }
+    });
+
+    await settingsPage.goto('forms');
+    await settingsPage.openNewFormEditor();
+    await settingsPage.createForm({
+      name: formName,
+      description: 'Smoke test form created by Playwright.'
+    });
   });
 
   test('settings form schema shell loads', async ({ page }) => {
@@ -81,22 +80,21 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.openAddEscalationGroupEditor();
   });
 
-  test('settings creates an escalation group and cleans up', async ({ page }) => {
+  test('settings creates an escalation group and cleans up', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const groupName = smokeLabel('escalation-group');
-
-    try {
-      await settingsPage.goto('escalations');
-      await settingsPage.goToEscalationsSubSection('Escalation Groups');
-      await settingsPage.createEscalationGroup({
-        name: groupName,
-        emails: 'smoke-escalation@example.com',
-        when: 'Smoke test: escalate when Playwright creates a draft escalation group.'
-      });
-      await settingsPage.expectEscalationGroupInList(groupName);
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteEscalationGroup(groupName);
-    }
+    });
+
+    await settingsPage.goto('escalations');
+    await settingsPage.goToEscalationsSubSection('Escalation Groups');
+    await settingsPage.createEscalationGroup({
+      name: groupName,
+      emails: 'smoke-escalation@example.com',
+      when: 'Smoke test: escalate when Playwright creates a draft escalation group.'
+    });
+    await settingsPage.expectEscalationGroupInList(groupName);
   });
 
   test('settings transfers section loads and opens add transfer editor', async ({ page }) => {
@@ -107,47 +105,44 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.openAddTransferEditor();
   });
 
-  test('settings creates a transfer and cleans up', async ({ page }) => {
+  test('settings creates a transfer and cleans up', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const transferName = smokeLabel('transfer');
-
-    try {
-      await settingsPage.goto('escalations');
-      await settingsPage.goToEscalationsSubSection('Transfers');
-      await settingsPage.createTransfer({
-        name: transferName,
-        when: 'Smoke test: transfer created by Playwright.'
-      });
-      await settingsPage.expectTransferInList(transferName);
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteTransfer(transferName);
-    }
+    });
+
+    await settingsPage.goto('escalations');
+    await settingsPage.goToEscalationsSubSection('Transfers');
+    await settingsPage.createTransfer({
+      name: transferName,
+      when: 'Smoke test: transfer created by Playwright.'
+    });
+    await settingsPage.expectTransferInList(transferName);
   });
 
-  test('settings creates a trigger and cleans up', async ({ page }) => {
+  test('settings creates a trigger and cleans up', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const triggerName = smokeLabel('trigger');
-
-    try {
-      await settingsPage.gotoTriggerAdmin();
-      await settingsPage.createTrigger({ name: triggerName });
-      await settingsPage.expectTriggerInList(triggerName);
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteTrigger(triggerName);
-    }
+    });
+
+    await settingsPage.gotoTriggerAdmin();
+    await settingsPage.createTrigger({ name: triggerName });
+    await settingsPage.expectTriggerInList(triggerName);
   });
 
-  test('settings creates a verification and cleans up', async ({ page }) => {
+  test('settings creates a verification and cleans up', async ({ page, trackCleanup }) => {
     const settingsPage = new VirtualAssistantSettingsPage(page);
     const verificationName = smokeLabel('verification');
-
-    try {
-      await settingsPage.goto('verifications');
-      await settingsPage.createVerification({ name: verificationName });
-      await settingsPage.expectVerificationInList(verificationName);
-    } finally {
+    trackCleanup(async () => {
       await settingsPage.deleteVerification(verificationName);
-    }
+    });
+
+    await settingsPage.goto('verifications');
+    await settingsPage.createVerification({ name: verificationName });
+    await settingsPage.expectVerificationInList(verificationName);
   });
 
   test('settings simulate situations tab shows agents table', async ({ page }) => {
