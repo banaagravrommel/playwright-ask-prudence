@@ -1646,20 +1646,41 @@ export class VirtualAssistantLivePage {
     }
   }
 
-  async goToPanel(panel: 'Activities' | 'Inbox' | 'SMS' | 'Calls' | 'QA' | 'Escalations') {
+  async goToPanel(
+    panel:
+      | 'Activities'
+      | 'Inbox'
+      | 'SMS'
+      | 'Calls'
+      | 'QA'
+      | 'Escalations'
+      | 'Continual Improvement'
+      | 'Assistants Todo List'
+      | 'Form Submissions'
+  ) {
     const itemClassByPanel = {
       Activities: 'nav-item-activities',
       Inbox: 'nav-item-inbox',
       SMS: 'nav-item-sms',
       Calls: 'nav-item-calls',
       QA: 'nav-item-qa',
-      Escalations: 'nav-item-escalations-live'
+      Escalations: 'nav-item-escalations-live',
+      'Continual Improvement': 'nav-item-continual-improvement',
+      'Assistants Todo List': 'nav-item-todo-list',
+      'Form Submissions': 'nav-item-form-submissions'
     } as const;
 
     const link = this.liveNav.locator(`a.${itemClassByPanel[panel]}`);
     await expect(link).toBeVisible();
     await link.click();
     await expect(link).toHaveClass(/active/);
+  }
+
+  private livePanelCard(heading: RegExp) {
+    return this.page
+      .locator('.card')
+      .filter({ has: this.page.locator(':scope > .card-header').getByRole('heading', { name: heading }) })
+      .first();
   }
 
   async expectActivitiesFeedPanel() {
@@ -1698,6 +1719,43 @@ export class VirtualAssistantLivePage {
     await expect(this.page.getByRole('heading', { name: /Escalation Tasks/i })).toBeVisible();
   }
 
+  async expectContinualImprovementPanel() {
+    await this.goToPanel('Continual Improvement');
+    await expect(this.page.getByRole('heading', { name: /Continual Improvement/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /Performance Trends/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /Improvement Suggestions/i })).toBeVisible();
+  }
+
+  async expectAssistantsTodoListPanel() {
+    await this.goToPanel('Assistants Todo List');
+    const panel = this.livePanelCard(/Assistants Todo List/i);
+    await expect(panel.getByRole('heading', { name: /Assistants Todo List/i })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(panel.getByPlaceholder(/^Search/i)).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Activity Types$/i }) })
+    ).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Statuses$/i }) })
+    ).toBeVisible();
+    await expect(panel.getByRole('columnheader', { name: /Activity Name/i })).toBeVisible();
+  }
+
+  async expectFormSubmissionsPanel() {
+    await this.goToPanel('Form Submissions');
+    const panel = this.livePanelCard(/Form Submissions/i);
+    await expect(panel.getByRole('heading', { name: /Form Submissions/i })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(panel.getByPlaceholder(/^Search/i)).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Forms$/i }) })
+    ).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Sources$/i }) })
+    ).toBeVisible();
+    await expect(panel.getByRole('columnheader', { name: /^Form$/i })).toBeVisible();
+  }
+
   /** Shell-only: nav + each required monitoring panel heading/controls. No live message content. */
   async expectMonitoringPanelsShell() {
     await this.expectMonitoringNav();
@@ -1707,6 +1765,13 @@ export class VirtualAssistantLivePage {
     await this.expectCallsPanel();
     await this.expectCommunicationQaPanel();
     await this.expectEscalationTasksPanel();
+  }
+
+  /** Shell-only: remaining Live Data panels beyond PW-028 monitoring coverage. No row/detail content. */
+  async expectRemainingPanelsShell() {
+    await this.expectContinualImprovementPanel();
+    await this.expectAssistantsTodoListPanel();
+    await this.expectFormSubmissionsPanel();
   }
 }
 
