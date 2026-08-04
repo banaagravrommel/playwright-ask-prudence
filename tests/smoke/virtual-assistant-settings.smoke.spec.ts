@@ -1,10 +1,11 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   VirtualAssistantLivePage,
   VirtualAssistantRealtimePage,
   VirtualAssistantSettingsPage
 } from '../page-objects/virtual-assistant-page';
 import { smokeLabel } from '../helpers/smoke-data';
+import { SMOKE_DOCUMENTS } from '../helpers/test-documents';
 
 test.describe('Virtual Assistant Settings smoke @smoke', () => {
   test('navigates all settings sidebar sections', async ({ page }) => {
@@ -12,6 +13,41 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await settingsPage.goto();
     await settingsPage.expectPageShell();
     await settingsPage.navigateAllSettingsSections();
+  });
+
+  test('settings knowledge base documents upload surface works', async ({ page }) => {
+    const settingsPage = new VirtualAssistantSettingsPage(page);
+    const kbName = smokeLabel('kb-docs');
+    const accountName = smokeLabel('kb-acct');
+    const fileName = 'smoke-doc-a.pdf';
+
+    try {
+      await settingsPage.goto();
+      await settingsPage.openAddKnowledgeBaseEditor();
+      await settingsPage.createKnowledgeBase({
+        name: kbName,
+        purpose: 'Smoke test knowledge base for documents upload.'
+      });
+
+      await settingsPage.openKnowledgeBaseEditor(kbName);
+      await settingsPage.openKnowledgeBaseAddDocuments();
+      await settingsPage.expectKnowledgeBaseDocumentUploadSurface();
+      await settingsPage.prepareKnowledgeBaseDocumentUpload({
+        filePath: SMOKE_DOCUMENTS[0],
+        accountName,
+        fileName
+      });
+
+      // Prefer a real upload; acceptance allows the prepared upload surface when blocked.
+      const attached = await settingsPage.uploadKnowledgeBaseDocument({ fileName });
+      if (attached) {
+        await expect(page.getByText(/Smoke Test Document A/i).first()).toBeVisible();
+      }
+      await settingsPage.cancelKnowledgeBaseDocumentUpload();
+      await settingsPage.cancelKnowledgeBaseEditor();
+    } finally {
+      await settingsPage.deleteKnowledgeBaseIfPresent(kbName);
+    }
   });
 
   test('settings saves a draft form', async ({ page }) => {
