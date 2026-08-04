@@ -1646,14 +1646,26 @@ export class VirtualAssistantLivePage {
     }
   }
 
-  async goToPanel(panel: 'Activities' | 'Inbox' | 'SMS' | 'Calls' | 'QA' | 'Escalations') {
+  async goToPanel(
+    panel:
+      | 'Activities'
+      | 'Inbox'
+      | 'SMS'
+      | 'Calls'
+      | 'QA'
+      | 'Escalations'
+      | 'Assistants Todo List'
+      | 'Form Submissions'
+  ) {
     const itemClassByPanel = {
       Activities: 'nav-item-activities',
       Inbox: 'nav-item-inbox',
       SMS: 'nav-item-sms',
       Calls: 'nav-item-calls',
       QA: 'nav-item-qa',
-      Escalations: 'nav-item-escalations-live'
+      Escalations: 'nav-item-escalations-live',
+      'Assistants Todo List': 'nav-item-todo-list',
+      'Form Submissions': 'nav-item-form-submissions'
     } as const;
 
     const link = this.liveNav.locator(`a.${itemClassByPanel[panel]}`);
@@ -1707,6 +1719,126 @@ export class VirtualAssistantLivePage {
     await this.expectCallsPanel();
     await this.expectCommunicationQaPanel();
     await this.expectEscalationTasksPanel();
+  }
+
+  private detailCandidates: Array<{
+    panel: 'Activities' | 'Escalations' | 'Assistants Todo List' | 'Form Submissions';
+    tableHeader: RegExp;
+    detailTitle: RegExp;
+    kind: 'side-drawer' | 'app-drawer' | 'inline';
+  }> = [
+    {
+      panel: 'Activities',
+      tableHeader: /^Agent$/i,
+      detailTitle: /Activity Details/i,
+      kind: 'side-drawer'
+    },
+    {
+      panel: 'Escalations',
+      tableHeader: /Task Name/i,
+      detailTitle: /Escalation Task Details/i,
+      kind: 'app-drawer'
+    },
+    {
+      panel: 'Assistants Todo List',
+      tableHeader: /Activity Name/i,
+      detailTitle: /Todo Details/i,
+      kind: 'app-drawer'
+    },
+    {
+      panel: 'Form Submissions',
+      tableHeader: /^Form$/i,
+      detailTitle: /Submission Details/i,
+      kind: 'inline'
+    }
+  ];
+
+  private panelTable(tableHeader: RegExp) {
+    return this.page.locator('table').filter({ has: this.page.getByRole('columnheader', { name: tableHeader }) }).first();
+  }
+
+  /**
+   * Opens the first available Live Data detail view.
+   * Returns null when no candidate panel has a View Details row (caller should skip).
+   */
+  async openFirstAvailableDetailDrawer(): Promise<{
+    panel: 'Activities' | 'Escalations' | 'Assistants Todo List' | 'Form Submissions';
+    kind: 'side-drawer' | 'app-drawer' | 'inline';
+    detailTitle: RegExp;
+  } | null> {
+    for (const candidate of this.detailCandidates) {
+      await this.goToPanel(candidate.panel);
+      const table = this.panelTable(candidate.tableHeader);
+      const viewDetails = table.locator('tbody tr').locator('button[title="View Details"], button:has(.fa-eye)').first();
+      if (!(await viewDetails.isVisible({ timeout: 3000 }).catch(() => false))) {
+        continue;
+      }
+
+      await viewDetails.click();
+
+      if (candidate.kind === 'side-drawer') {
+        const drawer = this.page.locator('.side-drawer.open');
+        await expect(drawer).toBeVisible({ timeout: 10000 });
+        await expect(drawer.getByText(candidate.detailTitle).first()).toBeVisible();
+      } else if (candidate.kind === 'app-drawer') {
+        await expect(this.page.locator('.drawer-heading').filter({ hasText: candidate.detailTitle })).toBeVisible({
+          timeout: 10000
+        });
+      } else {
+        await expect(this.page.getByText(candidate.detailTitle).first()).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByRole('button', { name: /Back to List/i })).toBeVisible();
+      }
+
+      return {
+        panel: candidate.panel,
+        kind: candidate.kind,
+        detailTitle: candidate.detailTitle
+      };
+    }
+
+    return null;
+  }
+
+  async expectDetailDrawerShell(opened: {
+    kind: 'side-drawer' | 'app-drawer' | 'inline';
+    detailTitle: RegExp;
+  }) {
+    if (opened.kind === 'side-drawer') {
+      const drawer = this.page.locator('.side-drawer.open');
+      await expect(drawer).toBeVisible();
+      await expect(drawer.getByText(opened.detailTitle).first()).toBeVisible();
+      await expect(drawer.locator('.side-drawer-header button')).toBeVisible();
+      return;
+    }
+
+    if (opened.kind === 'app-drawer') {
+      await expect(this.page.locator('.drawer-heading').filter({ hasText: opened.detailTitle })).toBeVisible();
+      await expect(this.page.locator('.app-drawer-wrapper .drawer-nav-btn button.hamburger')).toBeVisible();
+      return;
+    }
+
+    await expect(this.page.getByText(opened.detailTitle).first()).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Back to List/i })).toBeVisible();
+  }
+
+  async closeDetailDrawer(opened: { kind: 'side-drawer' | 'app-drawer' | 'inline'; detailTitle: RegExp }) {
+    if (opened.kind === 'side-drawer') {
+      const drawer = this.page.locator('.side-drawer.open');
+      await drawer.locator('.side-drawer-header button').click();
+      await expect(drawer).toBeHidden({ timeout: 10000 });
+      return;
+    }
+
+    if (opened.kind === 'app-drawer') {
+      await this.page.locator('.app-drawer-wrapper .drawer-nav-btn button.hamburger.is-active').click();
+      await expect(this.page.locator('.drawer-heading').filter({ hasText: opened.detailTitle })).toBeHidden({
+        timeout: 10000
+      });
+      return;
+    }
+
+    await this.page.getByRole('button', { name: /Back to List/i }).click();
+    await expect(this.page.getByText(opened.detailTitle).first()).toBeHidden({ timeout: 10000 });
   }
 }
 
