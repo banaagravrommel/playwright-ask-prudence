@@ -1525,6 +1525,51 @@ export class VirtualAssistantSettingsPage {
     await this.expectSimulateTestTab();
   }
 
+  simulateChatMessages() {
+    return this.page.locator('.simulation-chat-messages');
+  }
+
+  async sendSimulateTestMessage(message: string) {
+    const chatInput = this.page.getByPlaceholder(/Type a message to test the agent/i);
+    await expect(chatInput).toBeVisible();
+    await chatInput.fill(message);
+    await expect(chatInput).toHaveValue(message);
+    await chatInput.press('Enter');
+
+    await expect(this.simulateChatMessages().getByText(message, { exact: true })).toBeVisible({
+      timeout: 15000
+    });
+    await expect(chatInput).toHaveValue('');
+  }
+
+  async expectSimulateTestResponse(userMessage?: string) {
+    const chat = this.simulateChatMessages();
+    if (userMessage) {
+      await expect(chat.getByText(userMessage, { exact: true })).toBeVisible();
+    }
+
+    const assistantBubble = chat.locator('.d-flex.justify-content-start .bg-white.border .small').last();
+    await expect(assistantBubble).toBeVisible({ timeout: 180000 });
+    await expect(assistantBubble).not.toHaveText(/^\s*$/);
+    await expect(assistantBubble).not.toHaveText(/Thinking/i);
+  }
+
+  async clearSimulateTestConversation() {
+    const clearButton = this.page.getByTitle('Clear conversation');
+    if (!(await clearButton.isVisible().catch(() => false))) {
+      return;
+    }
+    await clearButton.click();
+  }
+
+  async leaveSimulateTestChat() {
+    const changeAgent = this.page.getByRole('button', { name: /Change Agent/i });
+    if (await changeAgent.isVisible().catch(() => false)) {
+      await changeAgent.click();
+    }
+    await this.expectSimulateSituationsTab();
+  }
+
   async navigateAllSettingsSections() {
     await this.expectKnowledgeBasesSection();
 
