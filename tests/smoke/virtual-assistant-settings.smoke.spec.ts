@@ -171,6 +171,25 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await livePage.expectMonitoringPanelsShell();
   });
 
+  test('live data creates an escalation task and cleans up', async ({ page, trackCleanup }) => {
+    const livePage = new VirtualAssistantLivePage(page);
+    const taskName = smokeLabel('escalation-task');
+    const team = smokeLabel('escalation-team');
+    trackCleanup(async () => {
+      await livePage.deleteEscalationTask(taskName);
+    });
+
+    await livePage.goto();
+    await livePage.expectLiveDataPage();
+    await livePage.expectEscalationTasksPanel();
+    await livePage.createEscalationTask({
+      team,
+      taskName,
+      description: 'Smoke test escalation task created by Playwright.'
+    });
+    await livePage.expectEscalationTaskInList(taskName);
+  });
+
   test('realtime page loads with call monitors', async ({ page }) => {
     const realtimePage = new VirtualAssistantRealtimePage(page);
     await realtimePage.goto();
