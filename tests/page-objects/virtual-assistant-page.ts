@@ -1962,6 +1962,20 @@ export class VirtualAssistantRealtimePage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  directionFilter() {
+    return this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^All Directions$/i }) })
+      .first();
+  }
+
+  statusFilter() {
+    return this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^All Statuses$/i }) })
+      .first();
+  }
+
   async expectRealtimePage() {
     await expect(this.page).toHaveURL(/\/virtual-assistant-realtime/);
     await expect(this.page.getByText(/Virtual Assistant Realtime/i).first()).toBeVisible();
@@ -1969,8 +1983,38 @@ export class VirtualAssistantRealtimePage {
     await expect(this.page.getByRole('link', { name: /Assistants/i }).first()).toBeVisible();
     await expect(this.page.getByRole('link', { name: /Live Data/i }).first()).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Refresh/i })).toBeVisible();
-    await expect(this.page.getByRole('combobox').nth(0)).toBeVisible();
-    await expect(this.page.getByRole('combobox').nth(1)).toBeVisible();
+    await expect(this.directionFilter()).toBeVisible();
+    await expect(this.statusFilter()).toBeVisible();
     await expect(this.page.getByText(/Webhook:/i)).toBeVisible();
+  }
+
+  async setDirectionFilter(direction: 'All Directions' | 'Inbound' | 'Outbound') {
+    await this.directionFilter().selectOption({ label: direction });
+    await expect(this.directionFilter()).toHaveValue(
+      direction === 'All Directions' ? '' : direction.toLowerCase()
+    );
+  }
+
+  async setStatusFilter(
+    status: 'All Statuses' | 'Queued' | 'Ringing' | 'In Progress' | 'Completed' | 'Failed' | 'Busy' | 'No Answer'
+  ) {
+    await this.statusFilter().selectOption({ label: status });
+  }
+
+  async refresh() {
+    await this.page.getByRole('button', { name: /Refresh/i }).click();
+  }
+
+  /** Shell-only after filter/refresh: filters + webhook + empty state or calls table. No call row content. */
+  async expectRealtimeFiltersShell() {
+    await expect(this.directionFilter()).toBeVisible();
+    await expect(this.statusFilter()).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(this.page.getByText(/Webhook:/i)).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /^Realtime$/i }).first()).toBeVisible();
+
+    const emptyState = this.page.getByRole('heading', { name: /No calls yet/i });
+    const callsHeading = this.page.getByRole('heading', { name: /^Calls$/i });
+    await expect(emptyState.or(callsHeading).first()).toBeVisible();
   }
 }

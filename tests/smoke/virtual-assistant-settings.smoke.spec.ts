@@ -218,4 +218,15 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await realtimePage.goto();
     await realtimePage.expectRealtimePage();
   });
+
+  test('realtime filters shell remains after direction and status change', async ({ page }) => {
+    const realtimePage = new VirtualAssistantRealtimePage(page);
+    await realtimePage.goto();
+    await realtimePage.expectRealtimePage();
+
+    await realtimePage.setDirectionFilter('Inbound');
+    await realtimePage.setStatusFilter('Completed');
+    await realtimePage.refresh();
+    await realtimePage.expectRealtimeFiltersShell();
+  });
 });
