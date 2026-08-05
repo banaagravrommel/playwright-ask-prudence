@@ -171,6 +171,13 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await livePage.expectMonitoringPanelsShell();
   });
 
+  test('live data remaining panels shell loads', async ({ page }) => {
+    const livePage = new VirtualAssistantLivePage(page);
+    await livePage.goto();
+    await livePage.expectLiveDataPage();
+    await livePage.expectRemainingPanelsShell();
+  });
+
   // Skip when Activities / Escalations / Todo / Form Submissions have no View Details rows.
   test('live data detail drawer shell loads when rows exist', async ({ page }) => {
     const livePage = new VirtualAssistantLivePage(page);
