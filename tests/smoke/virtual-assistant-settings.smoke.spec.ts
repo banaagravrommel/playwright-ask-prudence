@@ -178,6 +178,25 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await livePage.expectRemainingPanelsShell();
   });
 
+  test('live data creates an escalation task and cleans up', async ({ page, trackCleanup }) => {
+    const livePage = new VirtualAssistantLivePage(page);
+    const taskName = smokeLabel('escalation-task');
+    const team = smokeLabel('escalation-team');
+    trackCleanup(async () => {
+      await livePage.deleteEscalationTask(taskName);
+    });
+
+    await livePage.goto();
+    await livePage.expectLiveDataPage();
+    await livePage.expectEscalationTasksPanel();
+    await livePage.createEscalationTask({
+      team,
+      taskName,
+      description: 'Smoke test escalation task created by Playwright.'
+    });
+    await livePage.expectEscalationTaskInList(taskName);
+  });
+
   // Skip when Activities / Escalations / Todo / Form Submissions have no View Details rows.
   test('live data detail drawer shell loads when rows exist', async ({ page }) => {
     const livePage = new VirtualAssistantLivePage(page);
