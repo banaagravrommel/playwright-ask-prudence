@@ -1646,14 +1646,39 @@ export class VirtualAssistantLivePage {
     }
   }
 
-  async goToPanel(panel: 'Activities' | 'Inbox' | 'SMS' | 'Calls' | 'QA' | 'Escalations') {
+  async expectRemainingMonitoringNav() {
+    await expect(this.liveNav).toBeVisible();
+    for (const itemClass of [
+      'nav-item-continual-improvement',
+      'nav-item-todo-list',
+      'nav-item-form-submissions'
+    ] as const) {
+      await expect(this.liveNav.locator(`a.${itemClass}`)).toBeVisible();
+    }
+  }
+
+  async goToPanel(
+    panel:
+      | 'Activities'
+      | 'Inbox'
+      | 'SMS'
+      | 'Calls'
+      | 'QA'
+      | 'Escalations'
+      | 'Continual Improvement'
+      | 'Assistants Todo List'
+      | 'Form Submissions'
+  ) {
     const itemClassByPanel = {
       Activities: 'nav-item-activities',
       Inbox: 'nav-item-inbox',
       SMS: 'nav-item-sms',
       Calls: 'nav-item-calls',
       QA: 'nav-item-qa',
-      Escalations: 'nav-item-escalations-live'
+      Escalations: 'nav-item-escalations-live',
+      'Continual Improvement': 'nav-item-continual-improvement',
+      'Assistants Todo List': 'nav-item-todo-list',
+      'Form Submissions': 'nav-item-form-submissions'
     } as const;
 
     const link = this.liveNav.locator(`a.${itemClassByPanel[panel]}`);
@@ -1752,6 +1777,30 @@ export class VirtualAssistantLivePage {
     });
   }
 
+  async expectContinualImprovementPanel() {
+    await this.goToPanel('Continual Improvement');
+    await expect(this.page.getByRole('heading', { name: /Continual Improvement/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /Performance Trends/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /Improvement Suggestions/i })).toBeVisible();
+    await expect(this.page.getByText(/Success Rate/i).first()).toBeVisible();
+  }
+
+  async expectAssistantsTodoListPanel() {
+    await this.goToPanel('Assistants Todo List');
+    await expect(this.page.getByRole('heading', { name: /Assistants Todo List/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: /Activity Name/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: /Due Date/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i }).first()).toBeVisible();
+  }
+
+  async expectFormSubmissionsPanel() {
+    await this.goToPanel('Form Submissions');
+    await expect(this.page.getByRole('heading', { name: /Form Submissions/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: /^Form$/i })).toBeVisible();
+    await expect(this.page.getByRole('columnheader', { name: /Source/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Refresh/i }).first()).toBeVisible();
+  }
+
   /** Shell-only: nav + each required monitoring panel heading/controls. No live message content. */
   async expectMonitoringPanelsShell() {
     await this.expectMonitoringNav();
@@ -1761,6 +1810,14 @@ export class VirtualAssistantLivePage {
     await this.expectCallsPanel();
     await this.expectCommunicationQaPanel();
     await this.expectEscalationTasksPanel();
+  }
+
+  /** Shell-only: remaining Live Data nav panels not covered by expectMonitoringPanelsShell. */
+  async expectRemainingPanelsShell() {
+    await this.expectRemainingMonitoringNav();
+    await this.expectContinualImprovementPanel();
+    await this.expectAssistantsTodoListPanel();
+    await this.expectFormSubmissionsPanel();
   }
 }
 

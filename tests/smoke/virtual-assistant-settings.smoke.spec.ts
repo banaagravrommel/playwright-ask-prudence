@@ -171,6 +171,13 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await livePage.expectMonitoringPanelsShell();
   });
 
+  test('live data remaining panels shell loads', async ({ page }) => {
+    const livePage = new VirtualAssistantLivePage(page);
+    await livePage.goto();
+    await livePage.expectLiveDataPage();
+    await livePage.expectRemainingPanelsShell();
+  });
+
   test('live data creates an escalation task and cleans up', async ({ page, trackCleanup }) => {
     const livePage = new VirtualAssistantLivePage(page);
     const taskName = smokeLabel('escalation-task');
