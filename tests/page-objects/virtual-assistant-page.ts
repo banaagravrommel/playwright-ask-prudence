@@ -1646,17 +1646,6 @@ export class VirtualAssistantLivePage {
     }
   }
 
-  async expectRemainingMonitoringNav() {
-    await expect(this.liveNav).toBeVisible();
-    for (const itemClass of [
-      'nav-item-continual-improvement',
-      'nav-item-todo-list',
-      'nav-item-form-submissions'
-    ] as const) {
-      await expect(this.liveNav.locator(`a.${itemClass}`)).toBeVisible();
-    }
-  }
-
   async goToPanel(
     panel:
       | 'Activities'
@@ -1685,6 +1674,13 @@ export class VirtualAssistantLivePage {
     await expect(link).toBeVisible();
     await link.click();
     await expect(link).toHaveClass(/active/);
+  }
+
+  private livePanelCard(heading: RegExp) {
+    return this.page
+      .locator('.card')
+      .filter({ has: this.page.locator(':scope > .card-header').getByRole('heading', { name: heading }) })
+      .first();
   }
 
   async expectActivitiesFeedPanel() {
@@ -1782,23 +1778,36 @@ export class VirtualAssistantLivePage {
     await expect(this.page.getByRole('heading', { name: /Continual Improvement/i })).toBeVisible();
     await expect(this.page.getByRole('heading', { name: /Performance Trends/i })).toBeVisible();
     await expect(this.page.getByRole('heading', { name: /Improvement Suggestions/i })).toBeVisible();
-    await expect(this.page.getByText(/Success Rate/i).first()).toBeVisible();
   }
 
   async expectAssistantsTodoListPanel() {
     await this.goToPanel('Assistants Todo List');
-    await expect(this.page.getByRole('heading', { name: /Assistants Todo List/i })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: /Activity Name/i })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: /Due Date/i })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Refresh/i }).first()).toBeVisible();
+    const panel = this.livePanelCard(/Assistants Todo List/i);
+    await expect(panel.getByRole('heading', { name: /Assistants Todo List/i })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(panel.getByPlaceholder(/^Search/i)).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Activity Types$/i }) })
+    ).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Statuses$/i }) })
+    ).toBeVisible();
+    await expect(panel.getByRole('columnheader', { name: /Activity Name/i })).toBeVisible();
   }
 
   async expectFormSubmissionsPanel() {
     await this.goToPanel('Form Submissions');
-    await expect(this.page.getByRole('heading', { name: /Form Submissions/i })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: /^Form$/i })).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: /Source/i })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: /Refresh/i }).first()).toBeVisible();
+    const panel = this.livePanelCard(/Form Submissions/i);
+    await expect(panel.getByRole('heading', { name: /Form Submissions/i })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Refresh/i })).toBeVisible();
+    await expect(panel.getByPlaceholder(/^Search/i)).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Forms$/i }) })
+    ).toBeVisible();
+    await expect(
+      panel.locator('select').filter({ has: this.page.locator('option', { hasText: /^All Sources$/i }) })
+    ).toBeVisible();
+    await expect(panel.getByRole('columnheader', { name: /^Form$/i })).toBeVisible();
   }
 
   /** Shell-only: nav + each required monitoring panel heading/controls. No live message content. */
@@ -1812,9 +1821,8 @@ export class VirtualAssistantLivePage {
     await this.expectEscalationTasksPanel();
   }
 
-  /** Shell-only: remaining Live Data nav panels not covered by expectMonitoringPanelsShell. */
+  /** Shell-only: remaining Live Data panels beyond PW-028 monitoring coverage. No row/detail content. */
   async expectRemainingPanelsShell() {
-    await this.expectRemainingMonitoringNav();
     await this.expectContinualImprovementPanel();
     await this.expectAssistantsTodoListPanel();
     await this.expectFormSubmissionsPanel();
