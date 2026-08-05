@@ -1721,6 +1721,60 @@ export class VirtualAssistantLivePage {
   async expectEscalationTasksPanel() {
     await this.goToPanel('Escalations');
     await expect(this.page.getByRole('heading', { name: /Escalation Tasks/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Add Task/i })).toBeVisible();
+  }
+
+  async openAddEscalationTaskEditor() {
+    await this.page.getByRole('button', { name: /Add Task/i }).click();
+    await expect(this.page.getByRole('heading', { name: /Add Escalation Task/i })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Save Task/i })).toBeVisible();
+  }
+
+  async createEscalationTask(options: { team: string; taskName: string; description?: string }) {
+    await this.openAddEscalationTaskEditor();
+
+    await this.page.getByPlaceholder(/e\.g\., Support, Sales, Engineering/i).fill(options.team);
+    await expect(this.page.getByPlaceholder(/e\.g\., Support, Sales, Engineering/i)).toHaveValue(options.team);
+
+    await this.page.getByPlaceholder(/Brief task name/i).fill(options.taskName);
+    await expect(this.page.getByPlaceholder(/Brief task name/i)).toHaveValue(options.taskName);
+
+    if (options.description) {
+      await this.page.getByPlaceholder(/Detailed description of the escalation/i).fill(options.description);
+    }
+
+    const saveResponse = this.page.waitForResponse(
+      (response) =>
+        /\/aegis\/virtual-assistant\/escalation-tasks\/?$/.test(response.url()) &&
+        response.request().method() === 'POST' &&
+        response.status() === 201,
+      { timeout: 30000 }
+    );
+
+    const saveButton = this.page.getByRole('button', { name: /Save Task/i });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await saveResponse;
+
+    await expect(this.page.getByRole('row').filter({ hasText: options.taskName }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async expectEscalationTaskInList(taskName: string) {
+    await this.goto();
+    await this.expectEscalationTasksPanel();
+    await expect(this.page.getByRole('row').filter({ hasText: taskName }).first()).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  async deleteEscalationTask(taskName: string) {
+    await this.goto();
+    await this.expectEscalationTasksPanel();
+    await deleteRowByName(this.page, taskName, {
+      deleteButton: (row) => row.locator('button[title="Delete"]').first()
+    });
   }
 
   async expectContinualImprovementPanel() {
