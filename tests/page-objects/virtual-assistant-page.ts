@@ -640,6 +640,61 @@ export class AskPrudensPage {
     await expect(sidebar.getByText('Chats')).toBeVisible();
   }
 
+  sessionSidebar() {
+    return this.workbench.getByRole('complementary');
+  }
+
+  sessionTypeFilter() {
+    return this.sessionSidebar()
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^All types$/i }) })
+      .first();
+  }
+
+  sessionStatusFilter() {
+    return this.sessionSidebar()
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: /^All statuses$/i }) })
+      .first();
+  }
+
+  async setSessionTypeFilter(type: 'All types' | 'Ask Prudens' | 'Proposal' | 'Comparison' | 'Intake') {
+    await this.sessionTypeFilter().selectOption({ label: type });
+  }
+
+  async setSessionStatusFilter(status: 'All statuses' | 'Draft' | 'Sent' | 'Signed' | 'Archived') {
+    await this.sessionStatusFilter().selectOption({ label: status });
+  }
+
+  /** Shell-only after filter change: search/filters/new chat remain usable. No exact session content. */
+  async expectSessionListFiltersShell(options?: {
+    type?: 'All types' | 'Ask Prudens' | 'Proposal' | 'Comparison' | 'Intake';
+    status?: 'All statuses' | 'Draft' | 'Sent' | 'Signed' | 'Archived';
+  }) {
+    const sidebar = this.sessionSidebar();
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.getByRole('textbox', { name: /Search sessions/i })).toBeVisible();
+    await expect(this.sessionTypeFilter()).toBeVisible();
+    await expect(this.sessionStatusFilter()).toBeVisible();
+    await expect(sidebar.getByText('New chat')).toBeVisible();
+    await expect(sidebar.getByText('Accounts')).toBeVisible();
+    await expect(sidebar.getByText('Chats')).toBeVisible();
+
+    if (options?.type && options.type !== 'All types') {
+      const valueByType = {
+        'Ask Prudens': 'ask',
+        Proposal: 'proposal',
+        Comparison: 'comparison',
+        Intake: 'intake'
+      } as const;
+      await expect(this.sessionTypeFilter()).toHaveValue(valueByType[options.type]);
+    }
+
+    if (options?.status && options.status !== 'All statuses') {
+      await expect(this.sessionStatusFilter()).toHaveValue(options.status.toLowerCase());
+    }
+  }
+
   async expectWorkbench() {
     const workbench = this.workbench;
 
