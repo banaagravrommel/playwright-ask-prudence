@@ -229,4 +229,17 @@ test.describe('Virtual Assistant Settings smoke @smoke', () => {
     await realtimePage.refresh();
     await realtimePage.expectRealtimeFiltersShell();
   });
+
+  // Skip when Realtime has no call rows (even after Completed / All Statuses). Does not place a test call.
+  test('realtime call row actions shell loads when calls exist', async ({ page }) => {
+    const realtimePage = new VirtualAssistantRealtimePage(page);
+    await realtimePage.goto();
+    await realtimePage.expectRealtimePage();
+
+    const opened = await realtimePage.openFirstAvailableCallRowAction();
+    test.skip(!opened, 'No Realtime call rows available for Recording / Whisper / Take Over shell actions.');
+
+    await realtimePage.expectCallRowActionShell(opened!);
+    await realtimePage.closeCallRowActionShell(opened!);
+  });
 });
