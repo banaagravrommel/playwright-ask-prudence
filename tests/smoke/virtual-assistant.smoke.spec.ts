@@ -191,6 +191,20 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectWorkbench();
   });
 
+  test('ask prudens session list filters shell remains after type and status change', async ({ page }) => {
+    const askPage = new AskPrudensPage(page);
+    await askPage.goto();
+    await askPage.openSessionSidebar();
+    await askPage.dismissSessionLoadErrorIfPresent();
+
+    await askPage.setSessionTypeFilter('Ask Prudens');
+    await askPage.setSessionStatusFilter('Draft');
+    await askPage.expectSessionListFiltersShell({ type: 'Ask Prudens', status: 'Draft' });
+
+    await askPage.setSessionTypeFilter('Proposal');
+    await askPage.expectSessionListFiltersShell({ type: 'Proposal', status: 'Draft' });
+  });
+
   test('ask prudens new-chat type picker shell loads', async ({ page }) => {
     const askPage = new AskPrudensPage(page);
     await askPage.goto();
