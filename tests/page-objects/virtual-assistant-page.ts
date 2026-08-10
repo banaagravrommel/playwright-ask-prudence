@@ -435,9 +435,14 @@ export class AskPrudensPage {
   }
 
   async goto() {
-    await this.page.goto('/virtual-assistant/ask-prudens');
+    // Ask Prudens ships a very large app.js; the shell stays [v-cloak]/hidden until Vue mounts.
+    await this.page.goto('/virtual-assistant/ask-prudens', { waitUntil: 'commit' });
     await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
-    await this.page.waitForLoadState('networkidle');
+    await expect(this.workbench).toBeAttached({ timeout: 60000 });
+    await expect(this.workbench).not.toHaveAttribute('v-cloak', { timeout: 180000 });
+    await expect(
+      this.workbench.getByText(/New chat|AI Workbench|Search sessions/i).first()
+    ).toBeVisible({ timeout: 60000 });
     await this.dismissAppSidebarOverlap();
     await this.dismissSessionLoadErrorIfPresent();
   }
@@ -541,11 +546,9 @@ export class AskPrudensPage {
     await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
 
-    await this.page.getByRole('button', { name: /Sources/i }).click();
-    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
-    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+    await this.openSourcesTab();
     if (resourceName) {
-      await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
+      await this.expectSourceAttached(resourceName);
     } else {
       await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
     }
@@ -553,6 +556,39 @@ export class AskPrudensPage {
     await this.page.getByRole('button', { name: /Activities/i }).click();
     await expect(this.workbench.getByText('Activities').last()).toBeVisible();
     await expect(this.workbench.getByText(/No activities yet/i)).toBeVisible();
+  }
+
+  async openSourcesTab() {
+    await this.page.getByRole('button', { name: /Sources/i }).click();
+    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
+    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+  }
+
+  async expectSourceAttached(resourceName: string) {
+    await expect(this.workbench.getByText(resourceName).first()).toBeVisible({ timeout: 15000 });
+    await expect(this.workbench.getByText(/No sources attached/i)).toHaveCount(0);
+  }
+
+  /**
+   * Mid-session attach: open Sources → Add sources → pick an existing resource → Attach.
+   * Does not assert exact session chat contents.
+   */
+  async addExistingSourceMidSession(searchTerm: string) {
+    await this.openSourcesTab();
+    await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+    await this.workbench.getByText('Add sources').click();
+
+    const resourceName = await this.selectFirstExistingResource(searchTerm);
+
+    const attachButton = this.page.getByRole('button', { name: /^Attach$/i });
+    if (await attachButton.isVisible().catch(() => false)) {
+      await expect(attachButton).toBeEnabled({ timeout: 15000 });
+      await attachButton.click();
+    }
+
+    await this.openSourcesTab();
+    await this.expectSourceAttached(resourceName);
+    return resourceName;
   }
 
   async expectAskPrudensAgentDialog(agent = 'Demo') {
