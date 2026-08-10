@@ -191,6 +191,14 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectWorkbench();
   });
 
+  test('ask prudens new-chat type picker shell loads', async ({ page }) => {
+    const askPage = new AskPrudensPage(page);
+    await askPage.goto();
+    await askPage.openNewChatTypePicker();
+    await askPage.expectNewChatTypePickerShell();
+    await askPage.closeNewChatTypePicker();
+  });
+
   test('ask prudens creates a demo chat session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-flow');

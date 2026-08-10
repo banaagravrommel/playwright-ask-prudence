@@ -640,6 +640,47 @@ export class AskPrudensPage {
     await expect(sidebar.getByText('Chats')).toBeVisible();
   }
 
+  typePickerStep() {
+    return this.page.locator('.cf-step').filter({
+      has: this.page.getByRole('heading', { name: /What would you like to create/i })
+    });
+  }
+
+  async openNewChatTypePicker() {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+    await this.workbench.getByText('New chat').click({ force: true });
+    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  /** Shell-only: new-chat type picker cards + cancel. Does not create a session. */
+  async expectNewChatTypePickerShell() {
+    const picker = this.typePickerStep();
+    await expect(picker.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
+    await expect(picker.locator('button.cf-close-btn[title="Cancel"]')).toBeVisible();
+
+    for (const type of [
+      'Ask Prudens',
+      'Proposal',
+      'Comparison',
+      'Intake Match',
+      'Invoice',
+      'Custom'
+    ] as const) {
+      await expect(picker.locator('.cf-type-card__label', { hasText: type })).toBeVisible();
+    }
+  }
+
+  async closeNewChatTypePicker() {
+    const picker = this.typePickerStep();
+    await picker.locator('button.cf-close-btn[title="Cancel"]').click();
+    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeHidden({
+      timeout: 10000
+    });
+  }
+
   async expectWorkbench() {
     const workbench = this.workbench;
 
