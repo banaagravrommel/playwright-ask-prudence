@@ -556,15 +556,46 @@ export class AskPrudensPage {
   }
 
   async expectAskPrudensAgentDialog(agent = 'Demo') {
-    await this.page.getByRole('button', { name: new RegExp(agent, 'i') }).click();
-    const dialog = this.page.getByRole('dialog', { name: /Switch Agent/i });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
-    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
-    await expect(dialog.getByRole('combobox')).toContainText(agent);
+    await this.openSwitchAgentDialog(agent);
+    const dialog = this.switchAgentDialog();
     await expect(dialog.getByRole('button', { name: /Switch/i })).toBeVisible();
     await dialog.getByRole('button', { name: /Cancel/i }).click();
     await expect(dialog).toBeHidden();
+  }
+
+  switchAgentDialog() {
+    return this.page.getByRole('dialog', { name: /Switch Agent/i });
+  }
+
+  async openSwitchAgentDialog(currentAgent: string) {
+    await this.page.getByRole('button', { name: new RegExp(currentAgent, 'i') }).click();
+    const dialog = this.switchAgentDialog();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
+    await expect(dialog.getByRole('combobox')).toContainText(currentAgent);
+    return dialog;
+  }
+
+  /**
+   * Mid-session: open Switch Agent, pick another available agent, confirm.
+   * Verifies the session banner agent control reflects the new agent.
+   */
+  async switchAskPrudensAgent(fromAgent: string, toAgent: string, sessionTitle?: string) {
+    const dialog = await this.openSwitchAgentDialog(fromAgent);
+    const agentCombobox = dialog.getByRole('combobox');
+    await agentCombobox.selectOption({ label: toAgent });
+    await expect(agentCombobox).toContainText(toAgent);
+
+    await dialog.getByRole('button', { name: /Switch/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 15000 });
+
+    const banner = sessionTitle
+      ? this.page.getByRole('banner').filter({ hasText: sessionTitle }).first()
+      : this.page.getByRole('banner').first();
+    await expect(banner.getByRole('button', { name: new RegExp(toAgent, 'i') })).toBeVisible({
+      timeout: 15000
+    });
   }
 
   async expectAskPrudensSopDialog() {
@@ -693,6 +724,47 @@ export class AskPrudensPage {
     if (options?.status && options.status !== 'All statuses') {
       await expect(this.sessionStatusFilter()).toHaveValue(options.status.toLowerCase());
     }
+  }
+
+  typePickerStep() {
+    return this.page.locator('.cf-step').filter({
+      has: this.page.getByRole('heading', { name: /What would you like to create/i })
+    });
+  }
+
+  async openNewChatTypePicker() {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+    await this.workbench.getByText('New chat').click({ force: true });
+    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible({
+      timeout: 15000
+    });
+  }
+
+  /** Shell-only: new-chat type picker cards + cancel. Does not create a session. */
+  async expectNewChatTypePickerShell() {
+    const picker = this.typePickerStep();
+    await expect(picker.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
+    await expect(picker.locator('button.cf-close-btn[title="Cancel"]')).toBeVisible();
+
+    for (const type of [
+      'Ask Prudens',
+      'Proposal',
+      'Comparison',
+      'Intake Match',
+      'Invoice',
+      'Custom'
+    ] as const) {
+      await expect(picker.locator('.cf-type-card__label', { hasText: type })).toBeVisible();
+    }
+  }
+
+  async closeNewChatTypePicker() {
+    const picker = this.typePickerStep();
+    await picker.locator('button.cf-close-btn[title="Cancel"]').click();
+    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeHidden({
+      timeout: 10000
+    });
   }
 
   async expectWorkbench() {
@@ -2071,5 +2143,108 @@ export class VirtualAssistantRealtimePage {
     const emptyState = this.page.getByRole('heading', { name: /No calls yet/i });
     const callsHeading = this.page.getByRole('heading', { name: /^Calls$/i });
     await expect(emptyState.or(callsHeading).first()).toBeVisible();
+  }
+
+  private async firstCallRowWithActions(timeoutMs = 20000) {
+    const listen = this.page.locator('button[title="Listen to recording"]').first();
+    const whisper = this.page.getByPlaceholder(/Type whisper note/i).first();
+    const empty = this.page.getByRole('heading', { name: /No calls yet/i });
+    const loading = this.page.getByText(/Loading calls/i);
+
+    if (await loading.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await expect(loading).toBeHidden({ timeout: 30000 });
+    }
+
+    const outcome = listen.or(whisper).or(empty).first();
+    const appeared = await outcome.isVisible({ timeout: timeoutMs }).catch(() => false);
+    if (!appeared) {
+      return null;
+    }
+
+    if (await listen.isVisible().catch(() => false)) {
+      return this.page
+        .locator('table tbody tr')
+        .filter({ has: this.page.locator('button[title="Listen to recording"]') })
+        .first();
+    }
+
+    if (await whisper.isVisible().catch(() => false)) {
+      return this.page
+        .locator('table tbody tr')
+        .filter({ has: this.page.getByPlaceholder(/Type whisper note/i) })
+        .first();
+    }
+
+    return null;
+  }
+
+  /**
+   * Finds an existing call row (broadens Status filter if the default In Progress list is empty).
+   * Does not place a real outbound/inbound test call.
+   */
+  private async findCallRowOrNull() {
+    let row = await this.firstCallRowWithActions(5000);
+    if (row) {
+      return row;
+    }
+
+    for (const status of ['Completed', 'All Statuses'] as const) {
+      await this.setStatusFilter(status);
+      await this.refresh();
+      row = await this.firstCallRowWithActions(30000);
+      if (row) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Opens the first available call row action shell (Recording listen preferred; else Whisper/Take Over inputs).
+   * Returns null when no call rows exist.
+   */
+  async openFirstAvailableCallRowAction(): Promise<{
+    kind: 'recording' | 'inline';
+    row: Locator;
+  } | null> {
+    const row = await this.findCallRowOrNull();
+    if (!row) {
+      return null;
+    }
+
+    const listen = row.locator('button[title="Listen to recording"]');
+    if (await listen.isVisible().catch(() => false)) {
+      await listen.click();
+      await expect(listen.locator('i.fa-stop')).toBeVisible({ timeout: 15000 });
+      return { kind: 'recording', row };
+    }
+
+    await expect(
+      row.getByPlaceholder(/Type whisper note/i).or(row.getByPlaceholder(/Supervisor number/i)).first()
+    ).toBeVisible();
+    return { kind: 'inline', row };
+  }
+
+  async expectCallRowActionShell(opened: { kind: 'recording' | 'inline'; row: Locator }) {
+    if (opened.kind === 'recording') {
+      const listen = opened.row.locator('button[title="Listen to recording"]');
+      await expect(listen.locator('i.fa-stop')).toBeVisible();
+      await expect(opened.row.locator('a[title="Open recording"]')).toBeVisible();
+    }
+
+    await expect(
+      opened.row.getByPlaceholder(/Type whisper note/i).or(opened.row.getByPlaceholder(/Supervisor number/i)).first()
+    ).toBeVisible();
+  }
+
+  async closeCallRowActionShell(opened: { kind: 'recording' | 'inline'; row: Locator }) {
+    if (opened.kind !== 'recording') {
+      return;
+    }
+
+    const listen = opened.row.locator('button[title="Listen to recording"]');
+    await listen.click();
+    await expect(listen.locator('i.fa-headphones-alt')).toBeVisible({ timeout: 10000 });
   }
 }

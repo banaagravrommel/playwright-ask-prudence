@@ -205,6 +205,14 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectSessionListFiltersShell({ type: 'Proposal', status: 'Draft' });
   });
 
+  test('ask prudens new-chat type picker shell loads', async ({ page }) => {
+    const askPage = new AskPrudensPage(page);
+    await askPage.goto();
+    await askPage.openNewChatTypePicker();
+    await askPage.expectNewChatTypePickerShell();
+    await askPage.closeNewChatTypePicker();
+  });
+
   test('ask prudens creates a demo chat session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-flow');
@@ -241,6 +249,25 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectAskPrudensSessionTabs(resourceName);
     await askPage.expectAskPrudensAgentDialog('Certificate Review');
     await askPage.expectAskPrudensSopDialog();
+  });
+
+  test('ask prudens switches agent mid-session via Switch Agent', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-switch-agent');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+
+    await askPage.switchAskPrudensAgent('Demo', 'Certificate Review', sessionTitle);
+    await askPage.expectAskPrudensChatReady(sessionTitle, {
+      accountName: 'Demo',
+      agent: 'Certificate Review'
+    });
   });
 
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
