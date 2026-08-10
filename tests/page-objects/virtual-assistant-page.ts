@@ -556,15 +556,46 @@ export class AskPrudensPage {
   }
 
   async expectAskPrudensAgentDialog(agent = 'Demo') {
-    await this.page.getByRole('button', { name: new RegExp(agent, 'i') }).click();
-    const dialog = this.page.getByRole('dialog', { name: /Switch Agent/i });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
-    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
-    await expect(dialog.getByRole('combobox')).toContainText(agent);
+    await this.openSwitchAgentDialog(agent);
+    const dialog = this.switchAgentDialog();
     await expect(dialog.getByRole('button', { name: /Switch/i })).toBeVisible();
     await dialog.getByRole('button', { name: /Cancel/i }).click();
     await expect(dialog).toBeHidden();
+  }
+
+  switchAgentDialog() {
+    return this.page.getByRole('dialog', { name: /Switch Agent/i });
+  }
+
+  async openSwitchAgentDialog(currentAgent: string) {
+    await this.page.getByRole('button', { name: new RegExp(currentAgent, 'i') }).click();
+    const dialog = this.switchAgentDialog();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Choose a different agent/i)).toBeVisible();
+    await expect(dialog.getByRole('combobox')).toHaveValue(/.+/);
+    await expect(dialog.getByRole('combobox')).toContainText(currentAgent);
+    return dialog;
+  }
+
+  /**
+   * Mid-session: open Switch Agent, pick another available agent, confirm.
+   * Verifies the session banner agent control reflects the new agent.
+   */
+  async switchAskPrudensAgent(fromAgent: string, toAgent: string, sessionTitle?: string) {
+    const dialog = await this.openSwitchAgentDialog(fromAgent);
+    const agentCombobox = dialog.getByRole('combobox');
+    await agentCombobox.selectOption({ label: toAgent });
+    await expect(agentCombobox).toContainText(toAgent);
+
+    await dialog.getByRole('button', { name: /Switch/i }).click();
+    await expect(dialog).toBeHidden({ timeout: 15000 });
+
+    const banner = sessionTitle
+      ? this.page.getByRole('banner').filter({ hasText: sessionTitle }).first()
+      : this.page.getByRole('banner').first();
+    await expect(banner.getByRole('button', { name: new RegExp(toAgent, 'i') })).toBeVisible({
+      timeout: 15000
+    });
   }
 
   async expectAskPrudensSopDialog() {

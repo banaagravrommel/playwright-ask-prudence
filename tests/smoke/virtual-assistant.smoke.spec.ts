@@ -237,6 +237,25 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectAskPrudensSopDialog();
   });
 
+  test('ask prudens switches agent mid-session via Switch Agent', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-switch-agent');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+
+    await askPage.switchAskPrudensAgent('Demo', 'Certificate Review', sessionTitle);
+    await askPage.expectAskPrudensChatReady(sessionTitle, {
+      accountName: 'Demo',
+      agent: 'Certificate Review'
+    });
+  });
+
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     await vaPage.goto();
