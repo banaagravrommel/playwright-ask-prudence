@@ -469,9 +469,7 @@ export class AskPrudensPage {
   }
 
   async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo', resourceSearch?: string) {
-    await this.openSessionSidebar();
-    await this.workbench.getByText('New chat').click({ force: true });
-    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
+    await this.openNewChatTypePicker();
 
     await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
     await expect(this.page.getByRole('heading', { name: /Pick an account for "Ask Prudens"/i })).toBeVisible();
@@ -541,11 +539,9 @@ export class AskPrudensPage {
     await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
     await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
 
-    await this.page.getByRole('button', { name: /Sources/i }).click();
-    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
-    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+    await this.openSourcesTab();
     if (resourceName) {
-      await expect(this.workbench.getByText(resourceName).first()).toBeVisible();
+      await this.expectSourceAttached(resourceName);
     } else {
       await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
     }
@@ -553,6 +549,39 @@ export class AskPrudensPage {
     await this.page.getByRole('button', { name: /Activities/i }).click();
     await expect(this.workbench.getByText('Activities').last()).toBeVisible();
     await expect(this.workbench.getByText(/No activities yet/i)).toBeVisible();
+  }
+
+  async openSourcesTab() {
+    await this.page.getByRole('button', { name: /Sources/i }).click();
+    await expect(this.workbench.locator('li').filter({ hasText: /^Documents$/ })).toBeVisible();
+    await expect(this.workbench.getByText('Add sources')).toBeVisible();
+  }
+
+  async expectSourceAttached(resourceName: string) {
+    await expect(this.workbench.getByText(resourceName).first()).toBeVisible({ timeout: 15000 });
+    await expect(this.workbench.getByText(/No sources attached/i)).toHaveCount(0);
+  }
+
+  /**
+   * Mid-session attach: open Sources → Add sources → pick an existing resource → Attach.
+   * Does not assert exact session chat contents.
+   */
+  async addExistingSourceMidSession(searchTerm: string) {
+    await this.openSourcesTab();
+    await expect(this.workbench.getByText(/No sources attached/i)).toBeVisible();
+    await this.workbench.getByText('Add sources').click();
+
+    const resourceName = await this.selectFirstExistingResource(searchTerm);
+
+    const attachButton = this.page.getByRole('button', { name: /^Attach$/i });
+    if (await attachButton.isVisible().catch(() => false)) {
+      await expect(attachButton).toBeEnabled({ timeout: 15000 });
+      await attachButton.click();
+    }
+
+    await this.openSourcesTab();
+    await this.expectSourceAttached(resourceName);
+    return resourceName;
   }
 
   async expectAskPrudensAgentDialog(agent = 'Demo') {
