@@ -474,9 +474,7 @@ export class AskPrudensPage {
   }
 
   async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo', resourceSearch?: string) {
-    await this.openSessionSidebar();
-    await this.workbench.getByText('New chat').click({ force: true });
-    await expect(this.page.getByRole('heading', { name: /What would you like to create/i })).toBeVisible();
+    await this.openNewChatTypePicker();
 
     await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
     await expect(this.page.getByRole('heading', { name: /Pick an account for "Ask Prudens"/i })).toBeVisible();

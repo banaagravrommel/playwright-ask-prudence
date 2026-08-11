@@ -286,6 +286,22 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     });
   });
 
+  test('ask prudens adds a source mid-session via Add sources', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-sources');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+
+    const resourceName = await askPage.addExistingSourceMidSession('smoke');
+    await askPage.expectSourceAttached(resourceName);
+  });
+
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     await vaPage.goto();
