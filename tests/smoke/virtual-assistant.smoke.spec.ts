@@ -213,6 +213,20 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.closeNewChatTypePicker();
   });
 
+  test('ask prudens creates an invoice session via New chat', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('invoice');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startInvoiceChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectInvoiceSessionReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+    await askPage.expectSessionInWorkbenchList(sessionTitle);
+  });
+
   test('ask prudens creates a demo chat session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-flow');
