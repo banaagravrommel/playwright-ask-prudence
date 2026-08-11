@@ -286,6 +286,22 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     });
   });
 
+  test('ask prudens applies an SOP mid-session via Select SOP', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-apply-sop');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+
+    const sopLabel = await askPage.applyAskPrudensSop({ sessionTitle });
+    await askPage.expectAskPrudensSopAttached(sopLabel, sessionTitle);
+  });
+
   test('navigate from assistants list to ask prudens via sidebar', async ({ page }) => {
     const vaPage = new VirtualAssistantPage(page);
     await vaPage.goto();
