@@ -481,21 +481,10 @@ export class AskPrudensPage {
   async startAskPrudensChatSession(accountName: string, title: string, agent = 'Demo', resourceSearch?: string) {
     await this.openNewChatTypePicker();
 
-    await this.page.locator('div').filter({ hasText: /^Ask PrudensGeneral AI Q&A$/ }).first().click();
+    await this.typePickerStep().locator('.cf-type-card').filter({ hasText: /^Ask Prudens/i }).first().click();
     await expect(this.page.getByRole('heading', { name: /Pick an account for "Ask Prudens"/i })).toBeVisible();
 
-    await this.page.getByRole('textbox', { name: /Search accounts/i }).fill(accountName);
-    await this.page.waitForTimeout(1500);
-
-    const accountRow = this.page.getByRole('row').filter({ hasText: accountName }).first();
-    await expect(accountRow).toBeVisible({ timeout: 15000 });
-
-    const selectButton = accountRow.getByRole('button').last();
-    if (await selectButton.isVisible()) {
-      await selectButton.click();
-    } else {
-      await accountRow.click();
-    }
+    await this.pickWorkbenchAccount(accountName);
 
     await expect(this.page.getByRole('heading', { name: new RegExp(`Ask Prudens — ${accountName}`, 'i') })).toBeVisible({
       timeout: 15000
@@ -509,6 +498,74 @@ export class AskPrudensPage {
     await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
     await this.collapseSessionSidebar();
     return selectedResource;
+  }
+
+  async pickWorkbenchAccount(accountName: string) {
+    await this.page.getByRole('textbox', { name: /Search accounts/i }).fill(accountName);
+    await this.page.waitForTimeout(1500);
+
+    const accountRow = this.page.getByRole('row').filter({ hasText: accountName }).first();
+    await expect(accountRow).toBeVisible({ timeout: 15000 });
+
+    const selectButton = accountRow.getByRole('button').last();
+    if (await selectButton.isVisible()) {
+      await selectButton.click();
+    } else {
+      await accountRow.click();
+    }
+  }
+
+  /**
+   * New chat → Invoice create path in the Ask Prudens workbench.
+   * Completes account + agent + title, then Create Session.
+   */
+  async startInvoiceChatSession(accountName: string, title: string, agent = 'Demo') {
+    await this.openNewChatTypePicker();
+    await this.typePickerStep().locator('.cf-type-card').filter({ hasText: /^Invoice/i }).first().click();
+    await expect(this.page.getByRole('heading', { name: /Pick an account for "Invoice"/i })).toBeVisible({
+      timeout: 15000
+    });
+
+    await this.pickWorkbenchAccount(accountName);
+    await expect(this.page.getByRole('heading', { name: new RegExp(`Invoice — ${accountName}`, 'i') })).toBeVisible({
+      timeout: 15000
+    });
+
+    await this.agentSelect.selectOption({ label: agent });
+    await this.sessionTitleInput.fill(title);
+    await expect(this.createSessionButton).toBeEnabled();
+    await this.createSessionButton.click();
+    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
+    await this.collapseSessionSidebar();
+  }
+
+  async expectInvoiceSessionReady(title: string, options: { accountName?: string; agent?: string } = {}) {
+    const accountName = options.accountName ?? 'Demo';
+    const agent = options.agent ?? 'Demo';
+    const sessionBanner = this.page.getByRole('banner').filter({ hasText: title }).first();
+
+    await expect(sessionBanner).toBeVisible({ timeout: 30000 });
+    await expect(sessionBanner).toContainText(accountName);
+    await expect(sessionBanner).toContainText(new RegExp(agent, 'i'));
+    await expect(sessionBanner).toContainText(/draft/i);
+    await expect(sessionBanner.getByRole('button', { name: 'Chat' })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Sources/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask about invoice/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Generate Invoice/i }).first()).toBeVisible();
+  }
+
+  async expectSessionInWorkbenchList(title: string) {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+
+    const searchSessions = this.page.getByRole('textbox', { name: /Search sessions/i });
+    await searchSessions.fill(title);
+    await this.page.waitForTimeout(1000);
+
+    await expect(
+      this.workbench.locator('li.aw-nav__item.aw-nav__item--nested').filter({ hasText: title }).first()
+    ).toHaveCount(1, { timeout: 15000 });
   }
 
   async selectFirstExistingResource(searchTerm: string) {
