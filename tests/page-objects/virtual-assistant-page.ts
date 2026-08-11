@@ -440,8 +440,13 @@ export class AskPrudensPage {
     await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
     await expect(this.workbench).toBeAttached({ timeout: 60000 });
     await expect(this.workbench).not.toHaveAttribute('v-cloak', { timeout: 180000 });
+    // Sidebar "New chat" can be CSS-hidden when the nav is collapsed; empty state or active session chrome is enough.
     await expect(
-      this.workbench.getByText(/New chat|AI Workbench|Search sessions/i).first()
+      this.workbench
+        .getByRole('heading', { name: 'AI Workbench' })
+        .or(this.page.getByRole('button', { name: 'Chat' }))
+        .or(this.page.getByRole('textbox', { name: /Search sessions/i }))
+        .first()
     ).toBeVisible({ timeout: 60000 });
     await this.dismissAppSidebarOverlap();
     await this.dismissSessionLoadErrorIfPresent();
@@ -632,15 +637,63 @@ export class AskPrudensPage {
     });
   }
 
-  async expectAskPrudensSopDialog() {
+  selectSopDialog() {
+    return this.page.getByRole('dialog', { name: /Select SOP/i });
+  }
+
+  async openSelectSopDialog() {
     await this.page.getByRole('button', { name: /SOP/i }).click();
-    const dialog = this.page.getByRole('dialog', { name: /Select SOP/i });
+    const dialog = this.selectSopDialog();
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/Attach a Standard Operating Procedure/i)).toBeVisible();
     await expect(dialog.getByRole('combobox')).toBeVisible();
     await expect(dialog.getByRole('button', { name: /Apply/i })).toBeVisible();
+    return dialog;
+  }
+
+  async expectAskPrudensSopDialog() {
+    const dialog = await this.openSelectSopDialog();
     await dialog.getByRole('button', { name: /Cancel/i }).click();
     await expect(dialog).toBeHidden();
+  }
+
+  /**
+   * Mid-session: open Select SOP, pick an available SOP, Apply.
+   * Verifies the session banner SOP control reflects the attached SOP.
+   */
+  async applyAskPrudensSop(options: { sopLabel?: string; sessionTitle?: string } = {}) {
+    const dialog = await this.openSelectSopDialog();
+    const sopCombobox = dialog.getByRole('combobox');
+    await expect(sopCombobox).toBeVisible();
+    await expect
+      .poll(async () => sopCombobox.getByRole('option').count(), { timeout: 30000 })
+      .toBeGreaterThan(1);
+
+    const sopLabels = (await sopCombobox.getByRole('option').allTextContents()).map((label) => label.trim());
+    const sopLabel =
+      options.sopLabel ??
+      sopLabels.find((label) => label && !/select|none|no sop/i.test(label));
+    expect(sopLabel, 'expected at least one SOP option to apply').toBeTruthy();
+
+    await sopCombobox.selectOption({ label: sopLabel! });
+    await expect(sopCombobox).toContainText(sopLabel!);
+
+    const applyButton = dialog.getByRole('button', { name: /Apply/i });
+    await expect(applyButton).toBeEnabled();
+    await applyButton.click();
+    await expect(dialog).toBeHidden({ timeout: 15000 });
+
+    await this.expectAskPrudensSopAttached(sopLabel!, options.sessionTitle);
+    return sopLabel!;
+  }
+
+  async expectAskPrudensSopAttached(sopLabel: string, sessionTitle?: string) {
+    const banner = sessionTitle
+      ? this.page.getByRole('banner').filter({ hasText: sessionTitle }).first()
+      : this.page.getByRole('banner').first();
+    await expect(banner.getByRole('button', { name: new RegExp(sopLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') })).toBeVisible({
+      timeout: 15000
+    });
   }
 
   async collapseSessionSidebar() {
