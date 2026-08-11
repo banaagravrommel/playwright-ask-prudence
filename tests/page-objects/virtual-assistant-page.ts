@@ -568,6 +568,46 @@ export class AskPrudensPage {
     ).toHaveCount(1, { timeout: 15000 });
   }
 
+  /**
+   * New chat → Custom workflow create path in the Ask Prudens workbench.
+   * Completes account + agent + title, then Create Session.
+   */
+  async startCustomWorkflowSession(accountName: string, title: string, agent = 'Demo') {
+    await this.openNewChatTypePicker();
+    await this.typePickerStep().locator('.cf-type-card').filter({ hasText: /^Custom/i }).first().click();
+    await expect(this.page.getByRole('heading', { name: /Pick an account for "Custom"/i })).toBeVisible({
+      timeout: 15000
+    });
+
+    await this.pickWorkbenchAccount(accountName);
+    await expect(this.page.getByRole('heading', { name: new RegExp(`Custom — ${accountName}`, 'i') })).toBeVisible({
+      timeout: 15000
+    });
+
+    await this.agentSelect.selectOption({ label: agent });
+    await this.sessionTitleInput.fill(title);
+    await expect(this.createSessionButton).toBeEnabled();
+    await this.createSessionButton.click();
+    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 30000 });
+    await this.collapseSessionSidebar();
+  }
+
+  async expectCustomWorkflowSessionReady(title: string, options: { accountName?: string; agent?: string } = {}) {
+    const accountName = options.accountName ?? 'Demo';
+    const agent = options.agent ?? 'Demo';
+    const sessionBanner = this.page.getByRole('banner').filter({ hasText: title }).first();
+
+    await expect(sessionBanner).toBeVisible({ timeout: 30000 });
+    await expect(sessionBanner).toContainText(accountName);
+    await expect(sessionBanner).toContainText(new RegExp(agent, 'i'));
+    await expect(sessionBanner).toContainText(/draft/i);
+    await expect(sessionBanner.getByRole('button', { name: 'Chat' })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Sources/i })).toBeVisible();
+    await expect(sessionBanner.getByRole('button', { name: /Activities/i })).toBeVisible();
+    await expect(this.page.getByPlaceholder(/Ask Prudens anything/i)).toBeVisible();
+    await expect(this.page.getByRole('button', { name: /Ask/i })).toBeDisabled();
+  }
+
   async selectFirstExistingResource(searchTerm: string) {
     const resourceSelect = this.page.locator('.resource-select-wrapper');
     const resourceSearch = resourceSelect.locator('input[type="search"]').first();
