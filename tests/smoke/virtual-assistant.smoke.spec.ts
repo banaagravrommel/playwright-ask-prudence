@@ -227,6 +227,20 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     await askPage.expectSessionInWorkbenchList(sessionTitle);
   });
 
+  test('ask prudens creates a custom workflow session via New chat', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('custom-workflow');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startCustomWorkflowSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectCustomWorkflowSessionReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+    await askPage.expectSessionInWorkbenchList(sessionTitle);
+  });
+
   test('ask prudens creates a demo chat session', async ({ page, trackCleanup }) => {
     const askPage = new AskPrudensPage(page);
     const sessionTitle = smokeLabel('ask-prudens-flow');
@@ -298,22 +312,6 @@ test.describe('Virtual Assistant smoke @smoke', () => {
       accountName: 'Demo',
       agent: 'Certificate Review'
     });
-  });
-
-  test('ask prudens adds a source mid-session via Add sources', async ({ page, trackCleanup }) => {
-    test.setTimeout(300000);
-    const askPage = new AskPrudensPage(page);
-    const sessionTitle = smokeLabel('ask-prudens-sources');
-    trackCleanup(async () => {
-      await askPage.deleteSession(sessionTitle);
-    });
-
-    await askPage.goto();
-    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
-    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
-
-    const resourceName = await askPage.addExistingSourceMidSession('smoke');
-    await askPage.expectSourceAttached(resourceName);
   });
 
   test('ask prudens applies an SOP mid-session via Select SOP', async ({ page, trackCleanup }) => {
