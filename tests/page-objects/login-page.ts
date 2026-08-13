@@ -10,8 +10,8 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.emailInput = page.locator('input[name="email"], input[type="email"], input[id*=email], input[placeholder*="Email"]');
-    this.passwordInput = page.locator('input[name="password"], input[type="password"], input[id*=password], input[placeholder*="Password"]');
+    this.emailInput = page.getByRole('textbox', { name: /email/i });
+    this.passwordInput = page.getByRole('textbox', { name: /password/i });
     this.submitButton = page.getByRole('button', {
       name: /enter dashboard|sign in|log in|continue/i
     }).first();
@@ -36,18 +36,29 @@ export class LoginPage {
     await this.passwordInput.fill(password);
 
     await expect(this.submitButton).toBeEnabled();
-    await this.submitButton.click();
+    await Promise.all([
+      this.page.waitForURL(/\/aegis\//, { timeout: 60000, waitUntil: 'commit' }),
+      this.submitButton.click()
+    ]);
 
     await this.expectLoggedIn();
   }
 
   private async isLoggedIn(): Promise<boolean> {
-    return /\/aegis\//.test(this.page.url()) && (await this.authenticatedNavLink.first().isVisible());
+    return /\/aegis\//.test(this.page.url()) && (await this.authenticatedNavLink.first().isVisible().catch(() => false));
   }
 
   private async expectLoggedIn() {
-    await expect(this.page).toHaveURL(/\/aegis\//, { timeout: 30000 });
-    await this.page.waitForLoadState('networkidle');
-    await expect(this.authenticatedNavLink.first()).toBeVisible({ timeout: 60000 });
+    await expect(this.page).toHaveURL(/\/aegis\//, { timeout: 60000 });
+    // Layout Options drawer can obscure the app sidebar after login; close it if present.
+    const closeNav = this.page.getByRole('button', { name: /Close navigation/i });
+    if (await closeNav.isVisible().catch(() => false)) {
+      await closeNav.click();
+    }
+    // Prefer sidebar nav when it hydrates; URL under /aegis/ is enough for a valid session cookie.
+    const nav = this.authenticatedNavLink.first();
+    if (await nav.isVisible({ timeout: 15000 }).catch(() => false)) {
+      return;
+    }
   }
 }

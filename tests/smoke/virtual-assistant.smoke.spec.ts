@@ -314,6 +314,23 @@ test.describe('Virtual Assistant smoke @smoke', () => {
     });
   });
 
+  test('ask prudens reopens an existing session from Chats', async ({ page, trackCleanup }) => {
+    test.setTimeout(300000);
+    const askPage = new AskPrudensPage(page);
+    const sessionTitle = smokeLabel('ask-prudens-reopen');
+    trackCleanup(async () => {
+      await askPage.deleteSession(sessionTitle);
+    });
+
+    await askPage.goto();
+    await askPage.startAskPrudensChatSession('Demo', sessionTitle, 'Demo');
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+
+    await askPage.leaveActiveSession();
+    await askPage.openSessionFromChats(sessionTitle);
+    await askPage.expectAskPrudensChatReady(sessionTitle, { accountName: 'Demo', agent: 'Demo' });
+  });
+
   test('ask prudens applies an SOP mid-session via Select SOP', async ({ page, trackCleanup }) => {
     test.setTimeout(300000);
     const askPage = new AskPrudensPage(page);
