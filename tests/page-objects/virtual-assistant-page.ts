@@ -437,7 +437,10 @@ export class AskPrudensPage {
   async goto() {
     // Ask Prudens ships a very large app.js; the shell stays [v-cloak]/hidden until Vue mounts.
     await this.page.goto('/virtual-assistant/ask-prudens', { waitUntil: 'commit' });
-    await this.page.waitForURL(/\/virtual-assistant\/ask-prudens/);
+    await this.page.waitForURL(/\/virtual-assistant\/ask-prudens|\/login/, { timeout: 60000 });
+    if (/\/login/.test(this.page.url())) {
+      throw new Error('Ask Prudens goto landed on /login — storageState is missing or expired.');
+    }
     await expect(this.workbench).toBeAttached({ timeout: 60000 });
     await expect(this.workbench).not.toHaveAttribute('v-cloak', { timeout: 180000 });
     // Sidebar "New chat" can be CSS-hidden when the nav is collapsed; empty state or active session chrome is enough.
@@ -566,6 +569,46 @@ export class AskPrudensPage {
     await expect(
       this.workbench.locator('li.aw-nav__item.aw-nav__item--nested').filter({ hasText: title }).first()
     ).toHaveCount(1, { timeout: 15000 });
+  }
+
+  /**
+   * Leave the active workbench session shell (Back), then reload Ask Prudens for a clean sidebar reopen path.
+   * Does not delete the session.
+   */
+  async leaveActiveSession() {
+    const back = this.page.getByRole('button', { name: /^Back$/i }).first();
+    if (await back.isVisible().catch(() => false)) {
+      await back.click();
+      await this.page.waitForTimeout(1000);
+    }
+
+    // Return to workbench shell so Chats search is available for reopen.
+    await this.goto();
+  }
+
+  /**
+   * Search Chats sidebar and reopen an existing session by title.
+   */
+  async openSessionFromChats(title: string) {
+    await this.openSessionSidebar();
+    await this.dismissSessionLoadErrorIfPresent();
+
+    const searchSessions = this.page.getByRole('textbox', { name: /Search sessions/i });
+    await searchSessions.fill(title);
+    await this.page.waitForTimeout(1000);
+
+    const sessionItem = this.workbench.locator('li.aw-nav__item.aw-nav__item--nested').filter({ hasText: title }).first();
+    await expect(sessionItem).toHaveCount(1, { timeout: 15000 });
+
+    // Nested chat rows can be CSS-hidden until hover; force open via DOM click.
+    await sessionItem.evaluate((item) => {
+      (item as HTMLElement).click();
+    });
+
+    await expect(this.page.getByRole('banner').filter({ hasText: title }).first()).toBeVisible({
+      timeout: 30000
+    });
+    await expect(this.page.getByRole('button', { name: 'Chat' })).toBeVisible({ timeout: 15000 });
   }
 
   /**
